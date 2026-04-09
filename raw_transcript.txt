@@ -1,0 +1,41 @@
+[00:00 – 00:25] Opening — Hook
+“Payment operations teams at banks deal with millions of transactions every day — across RTC, EFT, SWIFT, PayShap, and more. The challenge isn’t collecting the data. It’s making sense of it in real time.
+This is PayControl — a payment monitoring and analytics dashboard built for exactly that.”
+---
+
+[00:25 – 00:55] Bank Switcher & FX Context
+“PayControl supports multiple institutions on a single platform.
+All data shown updates in real time for the active institution, with a live FX ticker at the top providing continuous cross‑currency context.”
+---
+
+[00:55 – 01:30] Overview — The Big Picture
+“The Overview gives you the day’s headline numbers — inbound and outbound transaction counts and values, plus the failure count across all channels.
+Below, the area chart shows inbound versus outbound flow across the trading day, making peaks and dips instantly visible.
+Channel health bars summarise each channel’s share of total volume — everything you need for a quick operational snapshot.”
+---
+
+[01:30 – 02:05] Flows — Channel Deep Dive
+“Flows is where you drill into individual channels.
+Select SWIFT, and you see inbound and outbound splits, transaction velocity, and a heatmap showing transaction density by day and hour.
+Hot spots immediately reveal when the channel is under load, while the velocity table ranks channels by throughput — ideal for capacity planning.”
+---
+
+[02:05 – 02:25] Analytics — Failure Intelligence
+“Analytics focuses on failure intelligence.
+See failure rates per channel, the most common reasons — like Insufficient Funds or AML Hold — and compare inbound and outbound volumes side by side.
+It’s designed to surface systemic issues fast.”
+---
+
+[02:25 – 02:50] Network — Operate and Act
+“The Network tab is your operations desk — every transaction listed with full detail, and a Failed‑Only filter to isolate exceptions instantly.
+---
+[02:50 – 03:10] Alerts Tab — Risk & Compliance
+“Alerts highlights items that need attention — organised by severity from critical to informational. Alerts can be acknowledged individually or in bulk, and exported for audit reporting. This gives risk and operations teams an immediate view of what matters most.”
+
+---
+[03:10 – 03:30] Compare Tab — Channel Benchmarking
+“Compare puts all payment channels side by side — volumes, values, and failure rates — so you can benchmark channel performance in a single view. It’s a fast way to spot outliers and trends across the network.”
+---
+[03:30 – 03:59] Close
+“Real‑time flow monitoring. Failure analytics. Transaction drill‑down. Compliance alerting.
+PayControl — payment operations intelligence in a fast, browser‑based dashboard, deployable to the cloud in minutes.”

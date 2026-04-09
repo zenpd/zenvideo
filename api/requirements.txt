@@ -1,0 +1,14 @@
+# FastAPI + server
+fastapi
+uvicorn[standard]
+sse-starlette
+python-multipart
+
+# Pipeline deps (mirrors ../requirements.txt)
+kokoro-onnx
+static-ffmpeg
+pydub
+soundfile
+audioop-lts
+num2words
+python-dotenv

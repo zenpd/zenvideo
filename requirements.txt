@@ -1,0 +1,21 @@
+# TTS Audio/Video Pipeline - Dependencies
+
+# Core TTS
+kokoro-onnx
+
+# Audio processing
+pydub
+soundfile
+audioop-lts
+
+# Number conversion
+num2words
+
+# FFmpeg wrapper
+static-ffmpeg
+
+# Config
+python-dotenv
+
+# UI
+streamlit
