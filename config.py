@@ -18,6 +18,22 @@ TTS_VOICE = os.getenv("TTS_VOICE", "af_sky")
 TTS_SPEED = float(os.getenv("TTS_SPEED", 1.1))
 TTS_LANG  = os.getenv("TTS_LANG", "en-us")
 
+# ── Available Kokoro voices ───────────────────────────────────────────────────
+AVAILABLE_VOICES = [
+    # American Female voices
+    "af_sky",
+    "af_bella",
+    "af_sarah",
+    "af_nicole",
+    # American Male voices
+    "am_adam",
+    "am_michael",
+    # British Female voices
+    "bf_emma",
+    # British Male voices
+    "bm_george",
+]
+
 # ── Model files ───────────────────────────────────────────────────────────────
 KOKORO_MODEL = os.getenv("KOKORO_MODEL", "kokoro-v0_19.onnx")
 VOICES_BIN   = os.getenv("VOICES_BIN", "voices.bin")

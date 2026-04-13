@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import streamlit as st
 from config import (
     WPM, GAP_SEC, GAP_MS,
-    KOKORO_MODEL, VOICES_BIN, TTS_VOICE, TTS_SPEED, TTS_LANG,
+    KOKORO_MODEL, VOICES_BIN, TTS_VOICE, TTS_SPEED, TTS_LANG, AVAILABLE_VOICES,
     RAW_TRANSCRIPT, TRANSCRIPT, SEGMENTS_DIR, FINAL_AUDIO, OUTPUT_VIDEO,
     VIDEO_FILE, AUDIO_BITRATE, SAMPLE_RATE, VIDEO_PRESET, VIDEO_CRF,
 )
@@ -126,6 +126,16 @@ with tab0:
         crf_0    = st.slider("CRF quality (lower = better)", 0, 51,
                               int(VIDEO_CRF), help="23 is the ffmpeg default")
 
+    col_c, col_d = st.columns(2)
+    with col_c:
+        start_0 = st.text_input("Start time (optional)", value="",
+                                placeholder="HH:MM:SS (e.g. 00:02:30)",
+                                help="Trim video from this timestamp")
+    with col_d:
+        end_0   = st.text_input("End time (optional)", value="",
+                                placeholder="HH:MM:SS (e.g. 00:10:00)",
+                                help="Trim video to this timestamp")
+
     webm_exists = Path(webm_in).exists()
     if not webm_exists:
         st.warning(f"File not found: `{webm_in}` — enter the correct path above.")
@@ -137,7 +147,9 @@ with tab0:
                                   webm_path=webm_in,
                                   output_path=mp4_out,
                                   preset=preset_0,
-                                  crf=str(crf_0))
+                                  crf=str(crf_0),
+                                  start=start_0 if start_0 else None,
+                                  end=end_0 if end_0 else None)
         _show_log(logs, ok)
         if ok and Path(mp4_out).exists():
             st.success(f"Created `{mp4_out}` — ready for Stage 3.")
@@ -207,8 +219,9 @@ with tab2:
         aud_out  = st.text_input("Output audio",     value=FINAL_AUDIO)
     with col_b:
         st.subheader("Voice settings")
-        voice_2  = st.text_input("Voice ID", value=TTS_VOICE,
-                                  help="e.g. af_sky, af_bella, am_adam")
+        voice_2  = st.selectbox("Voice ID", AVAILABLE_VOICES,
+                                  index=AVAILABLE_VOICES.index(TTS_VOICE) if TTS_VOICE in AVAILABLE_VOICES else 0,
+                                  help="Choose from available Kokoro voices")
         speed_2  = st.slider("Speed", 0.5, 2.0, TTS_SPEED, 0.05)
         lang_2   = st.selectbox("Language", ["en-us", "en-gb", "ja", "zh", "ko", "fr", "de"],
                                   index=["en-us","en-gb","ja","zh","ko","fr","de"].index(TTS_LANG)
