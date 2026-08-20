@@ -1,0 +1,41 @@
+00:00:00
+"This is command center — and it only ever tells you the truth." Land on the home screen. Up top: Platform Health, Applications, live off Prometheus right now. Below: Top Unhealthy Applications, Recent Recommendations, Security Posture Summary. Here's the tell: where we don't have a real signal yet — Agents, Active Incidents, Critical Gov. Events — it says "No data source," not a made-up number. [point at it] That's a deliberate choice. This platform would rather show you nothing than show you a lie.
+
+00:00:29
+"Every application actually reporting telemetry — nothing staged." Applications — subtitle says it outright: "Every application currently reporting telemetry to Prometheus." Search bar up top, live grid below. Every card on this screen is a real agentic app phoning home right now — ZenArc, Digital Onboarding, and the rest of the fleet. Click one — that's our way into a full Application Workspace.
+
+00:00:51
+"Zoom into one app, and the picture gets a lot more specific." We're inside Digital Onboarding now. Two tiles here are genuinely live: Active Alerts — real threshold breaches computed off live metrics — and Agent Topology, which is discovered straight from Phoenix trace data, not configured by hand. The others — Application Components, Top Recommendations, Recent Incidents, Grafana Dashboards — are marked "sample data" right on the card. Again: honest labeling over fake polish.
+
+00:01:17
+"Same rigor, applied to five different questions." Five tabs, one pattern, all live: Correctness, Consistency, Reliability, Observability, Infrastructure — each one a metric-card grid plus a trend chart, each one reading real numbers off the metrics pipeline for this specific app. Flip through two or three fast — that consistency of design is the point: whichever question you're asking about this agent, the answer comes from the same real pipeline.
+
+00:01:41
+"Who's actually running in here, and is anything on fire." Agents — a live card grid discovered from Phoenix spans, click any one for a full detail drawer. Flip to Alerts — if anything's actively firing, you'll see a red "🚨 N alerts currently firing" banner right at the top, computed live against real threshold rules. Hit + New Alert Rule to show how fast you can wire up a new one.
+
+00:02:06
+"Every number on every dashboard traces back to one formula, right here." Metrics Catalog — the registry behind everything you've just seen. Application Health Score's formula is printed in plain sight: avg(correctness, consistency, reliability, observability, governance, infrastructure, security). Filter by pillar, search any metric, and — for the right role — edit the Good/Bad thresholds live. Change one here, and it changes the severity coloring everywhere else in the platform.
+
+00:02:30
+"This is where we prove the agent is actually getting better." App set to ZenArc. Every dataset and run here is read live from Phoenix. Create a dataset, and the system auto-generates realistic new examples from that app's existing data via the model — no one hand-writes these. Hit Run v2 (improved) and it fires a real Phoenix experiment on ZenArc's live backend — no SDK, just a button. Below: real version history with score deltas, and a Recommendations panel generated straight from the lowest-scoring real annotations.
+
+00:03:00
+"Every score needs a receipt. This is the receipt." Pick a trace from the Recent Traces bar and the Span Tree Explorer shows exactly what the agent did — chain hops, tool calls, real latency in milliseconds. The workflow-state footer shows the real current step and flags if a human review was required. On the right, real evaluator annotations for this exact trace — not a generic checklist.
+
+00:03:23
+"We didn't simulate an attack. We ran one." The Red / Blue / Purple grid — click any card and it drills down to the exact spans and judge explanations behind that score. These numbers exist because we submitted five real adversarial scenarios into ZenArc's live agent — prompt injection, a buried KYC red flag, social engineering, a PII bait, a downplayed breach — and graded the real responses. The Judge Pipeline card at the bottom names the actual stack: Azure OpenAI as judge, a regex PII scanner, Phoenix's code evaluators.
+
+00:03:54
+"Where operational incidents will surface, fleet-wide." Filter by application, status — Open / Investigating / Mitigated / Resolved — and severity. Click a row and the Incident Detail Drawer slides in. This is the intended home for incident response once that pipeline exists — the UI is proven out end to end, ready for a real feed.
+
+00:04:14
+"Every suggestion, fleet-wide, in one place." Filter by application, pillar, severity, status — every recommendation card gets an Acknowledge action. Same pattern as Home's per-app panel, but zoomed out to the whole fleet. Today it's illustrative content proving out the UX; the live feed plugs into the same slot once the recommendation engine ships.
+
+00:04:33
+"The compliance backbone — built, and ready to light up." Filter by policy violation, PII event, jailbreak attempt, prompt injection, tool-permission violation — plus a full Audit Trail (Actor / Action / Target / Timestamp). This is the operational shell for governance events platform-wide; it's wired and waiting on the events pipeline, so today it's the framework, not the feed. Worth saying plainly on stage: "the surface is built, the backend's next."
+
+00:04:58
+"The control plane for the whole platform." Nine tabs — Application Registry, Metric Registry, Data Sources, Storage Tiers, Grafana Source Mappings, RBAC Roles, Users, API Keys, Environment Configuration. Two are worth lingering on: RBAC Roles is a real permission-by-role matrix computed from the actual access rules — not a mockup. And Storage Tiers tells the roadmap visually: Hot tier — Prometheus, tagged LIVE — then Warm (TimescaleDB) and Cold (pgvector), tagged PLANNED, with the downsampling flow — raw 15s → 1m → 1h → embeddings — laid out step by step.
+
+00:05:29
+"Evaluated. Traced. Attacked and held. Governed, tracked, and administered — some of it live today, all of it built to be real tomorrow. That's the platform."

@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import numpy as np
 import static_ffmpeg
 static_ffmpeg.add_paths()
 from pydub import AudioSegment
@@ -39,17 +40,20 @@ while i < len(lines):
 
 print(f"Total segments: {len(entries)}")
 
-# ── Generate TTS ─────────────────────────────────────────────────────────────
+# ── Generate TTS (Sequential, no per-segment export) ──────────────────────────
 GAP_MS = 1000   # 1 sec gap after each segment
+SAMPLE_RATE = 24000
 
-os.makedirs("segments", exist_ok=True)
+print("Generating audio segments...")
+start_time = time.time()
 
-final_audio = AudioSegment.silent(duration=0)
+# Build audio in memory without exporting each segment
+audio_parts = []
+gap_audio = np.zeros(int((GAP_MS / 1000) * SAMPLE_RATE), dtype=np.float32)
 
 for idx, (time_line, text_line) in enumerate(entries):
     clean_text = text_line.replace("—", ", ").replace("–", ", ").replace("'", "'").replace("'", "'")
-    print(f"\n[{idx+1}/{len(entries)}] {time_line}")
-    print(f"  Text: {clean_text[:70]}...")
+    print(f"[{idx+1}/{len(entries)}] {time_line[:15]}... ", end="", flush=True)
 
     try:
         samples, sample_rate = kokoro.create(
@@ -58,29 +62,37 @@ for idx, (time_line, text_line) in enumerate(entries):
             speed=1.1,
             lang="en-us"
         )
-
-        wav_file = f"temp_seg_{idx}.wav"
-        sf.write(wav_file, samples, sample_rate)
-        seg = AudioSegment.from_wav(wav_file)
-        os.remove(wav_file)
-
-        print(f"  TTS: {len(seg)/1000:.1f}s")
-
-        seg.export(f"segments/seg_{idx+1:02d}_{time_line.replace(':', '-')}.mp3", format="mp3")
-
-        final_audio += seg
-        if idx < len(entries) - 1:
-            final_audio += AudioSegment.silent(duration=GAP_MS)
-
-        print(f"  Total so far: {len(final_audio)/1000:.1f}s ✅")
+        
+        # Keep samples as numpy arrays (no WAV export)
+        samples = np.array(samples, dtype=np.float32)
+        audio_parts.append(samples)
+        audio_parts.append(gap_audio)
+        
+        elapsed = time.time() - start_time
+        print(f"✅ ({elapsed:.1f}s total)")
 
     except Exception as e:
-        print(f"  FAILED: {e}")
-        final_audio += AudioSegment.silent(duration=GAP_MS)
+        print(f"❌ FAILED: {e}")
+        audio_parts.append(gap_audio)
 
-    time.sleep(0.2)
-
-final_audio.export("final_audio.mp3", format="mp3")
-mins = len(final_audio) // 60000
-secs = (len(final_audio) % 60000) // 1000
-print(f"\n✅ Done! final_audio.mp3 — {mins}:{secs:02d}")
+# Combine all audio at once
+print("\nCombining audio...")
+if audio_parts:
+    final_audio = np.concatenate(audio_parts[:-1])  # Remove last gap
+    final_audio = np.clip(final_audio, -1.0, 1.0)
+    
+    # Export once as WAV then convert to MP3
+    print("Exporting to MP3...")
+    sf.write("final_audio.wav", final_audio, SAMPLE_RATE)
+    
+    # Convert WAV to MP3
+    wav_audio = AudioSegment.from_wav("final_audio.wav")
+    wav_audio.export("final_audio.mp3", format="mp3", bitrate="128k")
+    os.remove("final_audio.wav")
+    
+    total_time = time.time() - start_time
+    duration_sec = len(final_audio) / SAMPLE_RATE
+    mins = int(duration_sec) // 60
+    secs = int(duration_sec) % 60
+    print(f"\n✅ Done! final_audio.mp3 — {mins}:{secs:02d}")
+    print(f"Total time: {total_time:.1f}s")

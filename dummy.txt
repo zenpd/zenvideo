@@ -1,0 +1,125 @@
+# Payment Orchestrator — 50-Point Demo Narrative
+ 
+---
+ 
+## ACT 1: THE PROBLEM (Points 1–8)
+ 
+1. **Open with pain** — "Every day, financial institutions move trillions of dollars across dozens of payment rails — SWIFT, ACH, RTGS, SEPA — each with different costs, speeds, and risk profiles. Choosing the wrong one costs real money."
+ 
+2. **The manual problem** — "Today, treasury teams rely on static rule books, spreadsheets, and institutional memory to route payments. That's slow, inconsistent, and doesn't scale."
+ 
+3. **The cost of bad routing** — "A $500K wire sent over SWIFT when a same-day ACH would work costs $25 in fees vs $0.50. Multiplied across thousands of transactions, that's millions in avoidable cost."
+ 
+4. **Compliance complexity** — "Cross-border payments require corridor validation, AML screening, and regulatory checks that differ by region. Humans miss things."
+ 
+5. **Speed expectation mismatch** — "Corporate clients expect real-time confirmation. Manual routing creates bottlenecks and SLA breaches."
+ 
+6. **The opportunity** — "What if an AI agent could analyze every payment in milliseconds, score all available rails, apply compliance rules, and select the optimal route — automatically?"
+ 
+7. **Our answer** — "Meet the ZenLabs Payment Orchestration Platform — an agentic AI system that does exactly that, deployed on Azure Container Apps."
+ 
+8. **Architecture in one sentence** — "A LangGraph multi-agent workflow, powered by FastAPI, making real-time routing decisions across 4 regions and 16 payment rails."
+ 
+---
+ 
+## ACT 2: PLATFORM OVERVIEW (Points 9–18)
+ 
+9. **Land on the dashboard** — "This is the Payment Orchestration console. Notice the clean layout: region selector, available rails panel, orchestration form, and live agent workflow visualization."
+ 
+10. **Four regions supported** — "We cover US, UK, South Africa, and Europe — each with its own regulatory environment, rail ecosystem, and corridor map."
+ 
+11. **Select US region** — "Starting in the US. The platform immediately loads all available payment rails for this region — ACH, Wire Transfer, Real-Time Payments, SWIFT International, and Remittance."
+ 
+12. **Available Rails panel** — "On the left, we see each rail's speed score, cost efficiency, reliability, estimated processing time, and cost per transaction. This is live data from the platform's regional data service."
+ 
+13. **Speed vs cost tradeoff visualized** — "Notice the tradeoffs — Wire Transfer scores 95 on speed but only 40 on cost. ACH scores 95 on cost but 65 on speed. The AI navigates this automatically."
+ 
+14. **Corridor selector** — "Corridors define the payment path — USA → Canada, USA → UK, USA → Europe. Each corridor restricts which rails are eligible."
+ 
+15. **Switch to UK** — "Switching to UK instantly loads UK-specific rails: Faster Payments, BACS, CHAPS, and SWIFT GPI. Different rails, different scores, same decision intelligence."
+ 
+16. **South Africa view** — "In South Africa we have PayShap Instant — the real-time domestic rail — alongside RTGS for high-value and EFT for batch. Our AI understands the nuances of each."
+ 
+17. **Europe view** — "Europe brings SEPA Instant, SEPA Standard, SWIFT GPI, and CLS — each with different eligibility rules for amount ranges and corridors."
+ 
+18. **The intelligence layer** — "The platform doesn't just display rails — it scores them dynamically against the specific payment: amount, currency, corridor, deadline. That's the AI working."
+ 
+---
+ 
+## ACT 3: LIVE ORCHESTRATION (Points 19–30)
+ 
+19. **Set up the payment** — "Let's orchestrate a real payment. $50,000 USD, from ACC-001 to ACC-002, on the US → UK corridor."
+ 
+20. **Hit Orchestrate Payment** — "Watch the agent workflow visualization activate on the left. Four steps — Analyze, Score, Select, Execute — each lighting up in sequence."
+ 
+21. **Step 1: Analyze** — "The first agent validates the request — checks amount is positive, sender/receiver IDs present, corridor is valid. Takes milliseconds."
+ 
+22. **Step 2: Score Rails** — "The scoring agent fetches all US region rails, checks each against our corridor, amount, and constraints. Ineligible rails get filtered out — RealTimePayments can't handle cross-border, Remittance has a $10K cap."
+ 
+23. **Step 3: Select** — "The selection agent picks the highest composite score. ACH wins at 80.9 — cost-optimized for this amount and corridor."
+ 
+24. **Step 4: Execute** — "The execution agent submits the payment and returns a transaction ID. Total workflow time: under 500ms."
+ 
+25. **Result card appears** — "Look at the result panel. Transaction ID, selected rail, amount, currency, execution timestamp. Clean, structured, ready to integrate with any downstream system."
+ 
+26. **Rail Scores table** — "Below the result, we see every eligible rail and its scores side by side. ACH at 80.9, Wire Transfer at 79.7, SWIFT International at 73.3. Full transparency into the AI's decision."
+ 
+27. **Cost insight** — "ACH costs $0.50 per transaction. Wire Transfer would have cost $15. That's a $14.50 saving — on a single transaction, at scale across thousands of payments, this is transformative."
+ 
+28. **Speed insight** — "Wire Transfer settles in 30 minutes, ACH in 24 hours. For this non-urgent corridor payment, the AI correctly chose cost over speed."
+ 
+29. **Messages log** — "The platform logs every decision step: which rails were evaluated, why some were ineligible, what score was assigned, and which was selected. Full audit trail."
+ 
+30. **Try a high-value payment** — "Now let's change the amount to $5,000,000. Watch how the AI re-scores — ACH gets cut because it doesn't support high-value amounts. Wire Transfer and SWIFT now compete."
+ 
+---
+ 
+## ACT 4: AGENT INTELLIGENCE (Points 31–40)
+ 
+31. **LangGraph workflow** — "Under the hood, this is a LangGraph StateGraph — a directed acyclic graph of AI agents, each with a specific role and clear state transitions."
+ 
+32. **Four nodes, one graph** — "Analyze → Score → Select → Execute, with conditional routing. If analysis fails, the graph routes directly to a failure node. No crashes, no silent errors."
+ 
+33. **Corridor intelligence** — "The scoring agent accepts both corridor codes like 'US_UK' and human-readable labels like 'USA → United Kingdom'. It normalizes them automatically — no brittle string matching."
+ 
+34. **Rail type mapping** — "Each rail name maps to a canonical RailType enum: ACH → BATCH_ACH, Wire Transfer → SWIFT_GPI, RealTimePayments → NAMPAY. Meaningful categorization for downstream analytics."
+ 
+35. **Composite scoring formula** — "The score formula weights three dimensions: cost (30%), speed (40%), reliability (30%). The weights reflect industry priority — speed matters most, but cost and reliability balance it."
+ 
+36. **Eligibility gates** — "Before scoring, each rail passes eligibility checks: amount within min/max range, corridor in supported list, high-value flag. Zero-score rails are filtered before selection."
+ 
+37. **Structured logging** — "Every agent step emits structured logs with session ID, stage, and contextual data. In production, this feeds directly into Azure Monitor and application insights."
+ 
+38. **State persistence** — "The PaymentState dataclass carries all context through every node — payment request, scoring results, selected rail, execution output, error list. Nothing is lost between steps."
+ 
+39. **Error propagation** — "If any node encounters an error, it appends to the errors list and routes to the failed node. The response always comes back with full context — no HTTP 500s hiding the real issue."
+ 
+40. **Extensibility** — "Adding a new payment rail? Add one entry to `REGIONAL_RAILS` and one line to `_RAIL_TYPE_MAP`. The AI picks it up automatically on the next call."
+ 
+---
+ 
+## ACT 5: PRODUCTION DEPLOYMENT (Points 41–48)
+ 
+41. **Azure Container Apps** — "This is running live on Azure Container Apps — fully serverless, auto-scaling, zero infrastructure management."
+ 
+42. **Two services, one platform** — "Backend on `payment-orchestrator-be`, Frontend on `payment-orchestrator-fe`, both behind HTTPS with managed TLS certificates."
+ 
+43. **ACR image registry** — "Images are stored in Azure Container Registry — `zafacr`. The backend is a Python FastAPI + LangGraph image, frontend is a pre-built Vite React bundle served by http-server."
+ 
+44. **Revision-based deployments** — "Every update creates a new ACA revision — zero-downtime deployments, instant rollback capability. We can split traffic for canary releases."
+ 
+45. **CORS properly configured** — "The backend CORS policy explicitly allows the deployed frontend URL. Security-first — no wildcard origins in production traffic."
+ 
+46. **Environment-scoped configuration** — "All secrets and configuration flow through environment variables — no hardcoded values, no secrets in code. Production-ready from day one."
+ 
+47. **Health-checked revisions** — "ACA monitors each revision's health. Only Healthy revisions receive traffic — the `cors2` backend and `fix1` frontend are both live and healthy today."
+ 
+48. **Cross-platform images** — "Built for `linux/amd64` — runs on Azure's x86 infrastructure regardless of developer machine architecture (including Apple Silicon)."
+ 
+---
+ 
+## ACT 6: CLOSE & VISION (Points 49–50)
+ 
+49. **The bigger picture** — "What you've seen today is the foundation of an intelligent payment operations platform. This same architecture can extend to FX optimization, liquidity management, settlement netting, and real-time compliance screening — all as new LangGraph agent nodes."
+ 
+50. **The call to action** — "We've proven that AI-driven payment orchestration is not a future concept — it's running in production, making better routing decisions than any static rule book, in under 500 milliseconds. The question isn't whether to build this — it's how fast you want to get there. Let's talk."

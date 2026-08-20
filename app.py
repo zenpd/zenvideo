@@ -21,6 +21,7 @@ from config import (
     RAW_TRANSCRIPT, TRANSCRIPT, SEGMENTS_DIR, FINAL_AUDIO, OUTPUT_VIDEO,
     VIDEO_FILE, AUDIO_BITRATE, SAMPLE_RATE, VIDEO_PRESET, VIDEO_CRF,
 )
+from sync_and_merge import BG_MUSIC_OPTIONS
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
@@ -283,6 +284,12 @@ with tab3:
             "Auto-adjust tolerance (%)", 1, 30, 10,
             help="If durations differ by less than this %, no tempo adjustment is applied.",
         )
+        bg_music_3  = st.selectbox(
+            "Background music", 
+            options=list(BG_MUSIC_OPTIONS.keys()),
+            index=0,
+            help="Select background music to mix with TTS audio.",
+        )
 
     vid_ok = Path(vid_in).exists()
     aud_ok = Path(aud_in).exists()
@@ -302,6 +309,7 @@ with tab3:
                 audio_bitrate=bitrate_3,
                 sample_rate=int(sr_3),
                 tolerance=tolerance_3 / 100.0,
+                bg_music=BG_MUSIC_OPTIONS[bg_music_3],
             )
         _show_log(logs, ok)
         if ok and out_path and Path(out_path).exists():
