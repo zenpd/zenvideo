@@ -144,22 +144,57 @@ def pipeline_status():
     return result
 
 
+# ── File browser (used by the FilePicker UI component) ───────────────────────
+
+_SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "dist", "build"}
+
+@app.get("/api/files")
+def list_files(exts: str = ""):
+    """List files under the project root, optionally filtered by extension."""
+    ext_list = [e if e.startswith(".") else f".{e}" for e in
+                (e.strip().lower() for e in exts.split(",")) if e]
+
+    results = []
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
+        for fname in filenames:
+            fpath = Path(dirpath) / fname
+            if ext_list and fpath.suffix.lower() not in ext_list:
+                continue
+            try:
+                size = fpath.stat().st_size
+            except OSError:
+                continue
+            results.append({
+                "name": str(fpath.relative_to(ROOT)),
+                "ext":  fpath.suffix.lower(),
+                "size": size,
+            })
+
+    results.sort(key=lambda f: f["name"])
+    return results[:500]
+
+
 # ── File upload / download ────────────────────────────────────────────────────
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
-    dest = ROOT / file.filename
+    safe_name = Path(file.filename).name
+    if not safe_name:
+        raise HTTPException(400, "Invalid filename")
+    dest = ROOT / safe_name
     contents = await file.read()
     dest.write_bytes(contents)
-    return {"filename": file.filename, "size": len(contents)}
+    return {"filename": safe_name, "size": len(contents)}
 
 
 @app.get("/api/download/{filename}")
 def download_file(filename: str):
-    p = ROOT / filename
+    safe_name = Path(filename).name
+    p = ROOT / safe_name
     if not p.exists():
-        raise HTTPException(404, f"File not found: {filename}")
-    return FileResponse(str(p), filename=filename)
+        raise HTTPException(404, f"File not found: {safe_name}")
+    return FileResponse(str(p), filename=safe_name)
 
 
 # ── Transcript helpers ────────────────────────────────────────────────────────
@@ -316,6 +351,68 @@ def run_stage4(body: Stage4Config):
             "output_path": body.output_path,
         })
     }
+
+
+# ── Stage 5: Screen Recorder ──────────────────────────────────────────────────
+
+class Stage5StartConfig(BaseModel):
+    output_path:   str = "recording.webm"
+    video_idx:     str = "1"
+    audio_idx:     str = "0"
+    framerate:     int = 30
+    audio_bitrate: str = AUDIO_BITRATE
+
+
+@app.get("/api/stage/5/devices")
+def stage5_devices():
+    from screen_recorder import list_devices
+    return list_devices()
+
+
+@app.get("/api/stage/5/status")
+def stage5_status():
+    from screen_recorder import recording_status
+    return recording_status()
+
+
+@app.post("/api/stage/5/start")
+def stage5_start(body: Stage5StartConfig):
+    from screen_recorder import start_recording
+    result = start_recording(**body.model_dump())
+    if "error" in result:
+        raise HTTPException(409, result["error"])
+    return result
+
+
+@app.post("/api/stage/5/stop")
+def stage5_stop():
+    from screen_recorder import stop_recording
+    result = stop_recording()
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+# ── Stage 6: WebM + Transcript → Synced MP4 (one-shot) ───────────────────────
+
+class Stage6Config(BaseModel):
+    webm_path:        str
+    transcript_path:  str   = RAW_TRANSCRIPT
+    output_path:      str   = "output_synced.mp4"
+    voice:            str   = TTS_VOICE
+    speed:            float = TTS_SPEED
+    lang:             str   = TTS_LANG
+    wpm:              int   = WPM
+    gap_sec:          int   = GAP_SEC
+    audio_bitrate:    str   = AUDIO_BITRATE
+    sample_rate:      int   = SAMPLE_RATE
+    video_preset:     str   = VIDEO_PRESET
+    video_crf:        str   = VIDEO_CRF
+
+@app.post("/api/stage/6/run")
+def run_stage6(body: Stage6Config):
+    from webm_transcript_pipeline import webm_to_mp4
+    return {"job_id": _start_job(webm_to_mp4, body.model_dump())}
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────

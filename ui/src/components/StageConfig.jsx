@@ -1,4 +1,5 @@
 import { VoiceSelector } from './VoiceSelector'
+import { FilePicker } from './FilePicker'
 export function StageConfig({ fields, values, onChange, colors }) {
   return (
     <div
@@ -54,39 +55,33 @@ export function StageConfig({ fields, values, onChange, colors }) {
               ))}
             </select>
 
+          ) : field.type === 'text' ? (
+
+            <FilePicker
+              value={values[field.key] ?? field.default}
+              onChange={(val) => onChange(field.key, val)}
+              fileExts={field.fileExts || ''}
+              placeholder={field.default}
+            />
+
           ) : (
 
             <input
-              type={
-                field.type === 'number'
-                  ? 'number'
-                  : 'text'
-              }
+              type="number"
               value={
                 values[field.key] ?? field.default
               }
               min={field.min}
               max={field.max}
               step={
-                field.step ??
-                (field.type === 'number'
-                  ? 1
-                  : undefined)
+                field.step ?? 1
               }
               onChange={(e) =>
                 onChange(
                   field.key,
-                  field.type === 'number'
-                    ? (
-                        field.step &&
-                        field.step < 1
-                      )
-                      ? parseFloat(e.target.value)
-                      : parseInt(
-                          e.target.value,
-                          10
-                        )
-                    : e.target.value,
+                  (field.step && field.step < 1)
+                    ? parseFloat(e.target.value)
+                    : parseInt(e.target.value, 10),
                 )
               }
               className="input"

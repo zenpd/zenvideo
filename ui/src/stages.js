@@ -55,7 +55,24 @@ export const STAGE_COLORS = {
     cfg_bg:   'bg-rose-50/30',
     glow:     'hover:shadow-glow-rose',
   },
+  6: {  // WebM + Transcript → Synced MP4 (one-shot) — cyan
+    bar:      'from-cyan-500 to-cyan-600',
+    icon_bg:  'bg-cyan-50',
+    icon_fg:  'text-cyan-600',
+    badge:    'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200',
+    tag_bg:   'bg-cyan-50',
+    tag_text: 'text-cyan-700',
+    cfg_bg:   'bg-cyan-50/30',
+    glow:     '',
+  },
 }
+
+const VOICE_OPTIONS = [
+  'af', 'af_bella', 'af_nicole', 'af_sarah', 'af_sky',
+  'am_adam', 'am_michael', 'bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis',
+]
+
+const SPEED_OPTIONS = ['0.5', '0.75', '1.0', '1.1', '1.25', '1.5', '1.75', '2.0']
 
 export const STAGES = [
   {
@@ -96,7 +113,7 @@ export const STAGES = [
     description: 'Convert a .webm screen recording to MP4. Run this before Stage 3 if your video is a webm.',
     outputs:     ['Recording.mp4'],
     fields: [
-      { key: 'webm_path',   label: 'WebM input file',  type: 'text',   default: 'Recording.webm',  help: 'Path to your .webm screen recording' },
+      { key: 'webm_path',   label: 'WebM input file',  type: 'text',   default: 'Recording.webm',  fileExts: '.webm', help: 'Path to your .webm screen recording' },
       { key: 'output_path', label: 'MP4 output file',  type: 'text',   default: 'Recording.mp4' },
     //   { key: 'preset',      label: 'Encoding preset',  type: 'select', default: 'medium', options: ['fast','medium','slow'], help: 'Slower = smaller file' },
     //   { key: 'crf',         label: 'CRF quality',      type: 'number', default: '23', min: 0, max: 51, help: '0=lossless · 23=default · 51=worst' },
@@ -108,8 +125,8 @@ export const STAGES = [
     description: 'Reads raw_transcript.txt, converts numbers to spoken words, and writes timed transcript.txt.',
     outputs:     ['transcript.txt'],
     fields: [
-      { key: 'raw_path', label: 'Raw transcript',           type: 'text',   default: 'raw_transcript.txt' },
-      { key: 'out_path', label: 'Output transcript',        type: 'text',   default: 'transcript.txt' },
+      { key: 'raw_path', label: 'Raw transcript',           type: 'text',   default: 'raw_transcript.txt', fileExts: '.txt' },
+      { key: 'out_path', label: 'Output transcript',        type: 'text',   default: 'transcript.txt', fileExts: '.txt' },
       { key: 'wpm',      label: 'WPM (words / min)',        type: 'number', default: 150, min: 60, max: 400, help: 'Sets the segment timing' },
       { key: 'gap_sec',  label: 'Gap between segments (s)', type: 'number', default: 1, min: 0, max: 10 },
     ],
@@ -125,53 +142,35 @@ export const STAGES = [
         label: 'Transcript',
         type: 'text',
         default: 'transcript.txt',
+        fileExts: '.txt',
       },
       {
         key: 'model_path',
         label: 'Kokoro model (.onnx)',
         type: 'text',
         default: 'kokoro-v0_19.onnx',
+        fileExts: '.onnx',
       },
       {
         key: 'voices_path',
         label: 'Voices file (.bin)',
         type: 'text',
         default: 'voices.bin',
+        fileExts: '.bin',
       },
       {
         key: 'voice',
         label: 'Voice ID',
         type: 'select',
         default: 'af_sky',
-        options: [
-          'af',
-          'af_bella',
-          'af_nicole',
-          'af_sarah',
-          'af_sky',
-          'am_adam',
-          'am_michael',
-          'bf_emma',
-          'bf_isabella',
-          'bm_george',
-          'bm_lewis',
-        ],
+        options: VOICE_OPTIONS,
       },
       {
         key: 'speed',
         label: 'Speed',
         type: 'select',
         default: '1.1',
-        options: [
-          '0.5',
-          '0.75',
-          '1.0',
-          '1.1',
-          '1.25',
-          '1.5',
-          '1.75',
-          '2.0',
-        ],
+        options: SPEED_OPTIONS,
       },
       {
         key: 'lang',
@@ -214,16 +213,30 @@ export const STAGES = [
   {
     num:         3,
     name:        'Sync & Merge',
-    description: 'Merges TTS audio with video, auto-adjusting audio tempo so both tracks match in length.',
+    description: 'Merges TTS audio with video, trimming leading blank frames using hyperframe timing data when available.',
     outputs:     ['output.mp4'],
     fields: [
-      { key: 'video_path',    label: 'Input video',           type: 'text',   default: 'Recording.mp4' },
-      { key: 'audio_path',    label: 'TTS audio',             type: 'text',   default: 'final_audio.mp3' },
+      { key: 'video_path',    label: 'Input video',           type: 'text',   default: 'Recording.mp4', fileExts: '.mp4,.mov,.webm' },
+      { key: 'audio_path',    label: 'TTS audio',             type: 'text',   default: 'final_audio.mp3', fileExts: '.mp3,.wav' },
       { key: 'output_path',   label: 'Output video',          type: 'text',   default: 'output.mp4' },
       // { key: 'audio_bitrate', label: 'Audio bitrate',         type: 'text',   default: '128k' },
       // { key: 'sample_rate',   label: 'Sample rate (Hz)',      type: 'number', default: 48000, step: 1000 },
       // { key: 'tolerance',     label: 'Tempo tolerance (0–1)', type: 'number', default: 0.1, min: 0, max: 0.5, step: 0.01, help: 'Skip adjustment if diff < this fraction' },
     ],
   },
-  
+  {
+    num:         6,
+    name:        'WebM + Transcript → Synced MP4',
+    description: 'One-shot: converts a WebM recording plus its transcript straight into a timestamp-synced MP4, without running Stages 0–3 separately.',
+    outputs:     ['output_synced.mp4'],
+    fields: [
+      { key: 'webm_path',       label: 'WebM input',    type: 'text',   default: 'recording.webm',      fileExts: '.webm' },
+      { key: 'transcript_path', label: 'Transcript',    type: 'text',   default: 'raw_transcript.txt',  fileExts: '.txt' },
+      { key: 'output_path',     label: 'Output video',  type: 'text',   default: 'output_synced.mp4' },
+      { key: 'voice',           label: 'Voice ID',      type: 'select', default: 'af_sky', options: VOICE_OPTIONS },
+      { key: 'speed',           label: 'Speed',         type: 'select', default: '1.1',     options: SPEED_OPTIONS },
+      { key: 'wpm',             label: 'WPM (raw transcript only)', type: 'number', default: 150, min: 60, max: 400, help: 'Used only if the transcript has no timestamps' },
+      { key: 'gap_sec',         label: 'Gap between segments (s)',  type: 'number', default: 1, min: 0, max: 10 },
+    ],
+  },
 ]

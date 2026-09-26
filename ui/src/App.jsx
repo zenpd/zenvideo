@@ -3,6 +3,7 @@ import { useStatus } from './hooks/useStatus'
 import { Header } from './components/Header'
 import { StatusPanel } from './components/StatusPanel'
 import { StageCard } from './components/StageCard'
+import { ScreenRecorderCard } from './components/ScreenRecorderCard'
 import { ShieldCheck } from 'lucide-react'
 
 function Footer() {
@@ -61,6 +62,7 @@ export default function App() {
           {STAGES.map((stage) => (
             <StageCard key={stage.num} stage={stage} />
           ))}
+          <ScreenRecorderCard />
         </div>
 
         <Footer />

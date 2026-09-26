@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Play, RotateCcw, Settings, ChevronDown,
-  Video, FileText, Mic, Film,
+  Video, FileText, Mic, Film, Combine,
   CheckCircle2, XCircle, Loader, Download,
 } from 'lucide-react'
 import { STAGE_COLORS } from '../stages'
@@ -10,7 +10,7 @@ import { StageConfig } from './StageConfig'
 // import { VoicePreview } from './VoicePreview'
 import { LogTerminal } from './LogTerminal'
 
-const ICONS = [Video, FileText, Mic, Film, Video]
+const ICONS = { 0: Video, 1: FileText, 2: Mic, 3: Film, 4: Video, 6: Combine }
 
 function StatusBadge({ status }) {
   if (status === 'idle')    return <span className="badge-idle">idle</span>

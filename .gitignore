@@ -2,6 +2,7 @@
 *.bin
 *.mp4
 *.mp3
+*.webm
 
 # Environment — keep .env.example, ignore real .env
 .env

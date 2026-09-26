@@ -6,7 +6,7 @@ kokoro-onnx
 # Audio processing
 pydub
 soundfile
-# audioop-lts
+audioop-lts; python_version >= "3.13"
 
 # Number conversion
 num2words
