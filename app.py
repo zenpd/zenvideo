@@ -295,6 +295,9 @@ with tab3:
             size_mb = Path(out_path).stat().st_size / 1_048_576
             st.success(f"Created `{out_path}` ({size_mb:.1f} MB)")
 
+            st.subheader("🎬 Output Video")
+            st.video(str(out_path))
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Status & Config

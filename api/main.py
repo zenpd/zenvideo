@@ -20,7 +20,7 @@ from queue import Queue, Empty
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
 import uvicorn
@@ -231,6 +231,56 @@ def run_stage2(body: Stage2Config):
     return {"job_id": _start_job(generate_audio, body.model_dump())}
 
 
+
+@app.get("/api/tts/preview/{voice}")
+def preview_voice(
+    voice: str,
+    speed: float = TTS_SPEED,
+    lang: str = TTS_LANG,
+):
+    from io import BytesIO
+    import soundfile as sf
+    from tts_generator import _load_kokoro
+
+    # Load the Kokoro model
+    kokoro = _load_kokoro(KOKORO_MODEL, VOICES_BIN)
+
+    # Validate the requested voice
+    available_voices = kokoro.get_voices()
+
+    if voice not in available_voices:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown voice '{voice}'. Available voices: {available_voices}",
+        )
+
+    # Short sentence used for voice preview
+    preview_text = "Hello, I am your voice assistant."
+
+    # Generate speech
+    samples, sample_rate = kokoro.create(
+        preview_text,
+        voice=voice,
+        speed=speed,
+        lang=lang,
+    )
+
+    # Convert WAV to memory
+    audio_buffer = BytesIO()
+
+    sf.write(
+        audio_buffer,
+        samples,
+        sample_rate,
+        format="WAV",
+    )
+
+    return Response(
+        content=audio_buffer.getvalue(),
+        media_type="audio/wav",
+    )
+
+
 # ── Stage 3: Sync & Merge ─────────────────────────────────────────────────────
 
 class Stage3Config(BaseModel):
@@ -245,6 +295,27 @@ class Stage3Config(BaseModel):
 def run_stage3(body: Stage3Config):
     from sync_and_merge import sync_and_merge
     return {"job_id": _start_job(sync_and_merge, body.model_dump())}
+
+
+# ── Stage 4: Browser Recording ───────────────────────────────────────────────
+
+class Stage4Config(BaseModel):
+    url: str
+    transcript_path: str = RAW_TRANSCRIPT
+    output_path: str = "video-recordings/recording.webm"
+
+
+@app.post("/api/stage/4/run")
+def run_stage4(body: Stage4Config):
+    from generate_recording import generate_recording
+
+    return {
+        "job_id": _start_job(generate_recording, {
+            "url": body.url,
+            "transcript_path": body.transcript_path,
+            "output_path": body.output_path,
+        })
+    }
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────

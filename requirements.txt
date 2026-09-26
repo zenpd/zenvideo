@@ -6,7 +6,7 @@ kokoro-onnx
 # Audio processing
 pydub
 soundfile
-audioop-lts
+# audioop-lts
 
 # Number conversion
 num2words
@@ -16,6 +16,8 @@ static-ffmpeg
 
 # Config
 python-dotenv
+openai
+playwright
 
 # UI
 streamlit

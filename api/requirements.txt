@@ -9,6 +9,9 @@ kokoro-onnx
 static-ffmpeg
 pydub
 soundfile
-audioop-lts
+# audioop-lts
 num2words
 python-dotenv
+
+openai
+playwright

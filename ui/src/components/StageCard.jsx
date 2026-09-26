@@ -7,9 +7,10 @@ import {
 import { STAGE_COLORS } from '../stages'
 import { useStageRunner } from '../hooks/useStageRunner'
 import { StageConfig } from './StageConfig'
+// import { VoicePreview } from './VoicePreview'
 import { LogTerminal } from './LogTerminal'
 
-const ICONS = [Video, FileText, Mic, Film]
+const ICONS = [Video, FileText, Mic, Film, Video]
 
 function StatusBadge({ status }) {
   if (status === 'idle')    return <span className="badge-idle">idle</span>
@@ -116,12 +117,12 @@ export function StageCard({ stage }) {
 
       {/* ── Config panel ── */}
       {configOpen && (
-        <StageConfig
-          fields={fields}
-          values={config}
-          onChange={handleChange}
-          colors={c}
-        />
+          <StageConfig
+            fields={fields}
+            values={config}
+            onChange={handleChange}
+            colors={c}
+          />
       )}
 
       {/* ── Action bar ── */}
