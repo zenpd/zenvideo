@@ -1,6 +1,7 @@
 """
 TTS Audio/Video Pipeline — Streamlit UI
-Stage-wise interface for: WebM→MP4 | Format Transcript | Generate TTS | Sync & Merge
+Stage-wise interface for: WebM→MP4 | Format Transcript | Generate TTS | Sync & Merge |
+Browser Recording | Screen Recorder | One-Shot WebM+Transcript Sync
 
 Run with:
   streamlit run app.py
@@ -89,17 +90,21 @@ with st.sidebar:
 st.title("🎬 TTS Audio / Video Pipeline")
 st.markdown(
     "**Stage-by-stage pipeline:** "
-    "`0: WebM → MP4` → `1: Format Transcript` → `2: Generate TTS` → `3: Sync & Merge`"
+    "`0: WebM → MP4` → `1: Format Transcript` → `2: Generate TTS` → `3: Sync & Merge` — "
+    "plus independent stages `4: Browser Recording`, `5: Screen Recorder`, `6: One-Shot Sync`"
 )
 st.divider()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tab0, tab1, tab2, tab3, tab4 = st.tabs([
+tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab_status = st.tabs([
     "🎥  Stage 0 — WebM → MP4",
     "📝  Stage 1 — Format Transcript",
     "🔊  Stage 2 — Generate TTS",
     "🎬  Stage 3 — Sync & Merge",
+    "🌐  Stage 4 — Browser Recording",
+    "🖥️  Stage 5 — Screen Recorder",
+    "🧩  Stage 6 — One-Shot Sync",
     "📊  Status & Config",
 ])
 
@@ -300,9 +305,226 @@ with tab3:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Status & Config
+# Stage 4: Browser Recording
 # ─────────────────────────────────────────────────────────────────────────────
 with tab4:
+    st.header("Stage 4 — Browser Recording")
+    st.info(
+        "Drives a real Chromium window (Playwright) through a narrated demo: for each "
+        "transcript segment, Azure OpenAI turns the narration into concrete UI actions "
+        "(click/type/scroll) against the page's currently visible elements, and the "
+        "whole session is screen-recorded to a `.webm`. Independent of Stages 0-3 — "
+        "run it any time. A visible browser window will open on your screen."
+    )
+
+    azure_ok = all(os.environ.get(k) for k in
+                   ("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_DEPLOYMENT"))
+    if not azure_ok:
+        st.warning(
+            "Azure OpenAI credentials not found in the environment "
+            "(`AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_DEPLOYMENT`) — "
+            "set them in `.env` before running this stage."
+        )
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        url_4 = st.text_input("Target URL", value="", placeholder="https://…",
+                               help="The page Playwright will open and interact with")
+        transcript_4 = st.text_input("Transcript (narration script)", value=RAW_TRANSCRIPT,
+                                      key="t4_transcript")
+    with col_b:
+        output_4 = st.text_input("Output .webm path", value="video-recordings/recording.webm",
+                                  key="t4_output")
+
+    transcript_4_ok = Path(transcript_4).exists()
+    if not transcript_4_ok:
+        st.warning(f"Transcript not found: `{transcript_4}`")
+
+    can_run_4 = bool(url_4.strip()) and transcript_4_ok
+    if st.button("▶️  Start Browser Recording", key="btn_stage4", disabled=not can_run_4):
+        with st.spinner("Recording — a Chromium window will open on your screen…"):
+            from generate_recording import generate_recording
+            ok, logs, out_path = _run(
+                generate_recording,
+                url=url_4,
+                transcript_path=transcript_4,
+                output_path=output_4,
+            )
+        _show_log(logs, ok)
+        if ok and out_path and Path(out_path).exists():
+            st.success(f"Created `{out_path}`")
+            st.video(str(out_path))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 5: Screen Recorder
+# ─────────────────────────────────────────────────────────────────────────────
+with tab5:
+    st.header("Stage 5 — Screen Recorder")
+    st.info(
+        "Captures your own screen + microphone straight to a `.webm`/`.mp4` via FFmpeg "
+        "avfoundation (macOS) — an alternative to Stage 4's automated browser recording. "
+        "Requires Screen Recording permission for the process running ffmpeg "
+        "(System Settings → Privacy & Security → Screen Recording), or capture can "
+        "silently hang instead of erroring."
+    )
+
+    from screen_recorder import list_devices, start_recording, stop_recording, recording_status
+
+    status_5 = recording_status()
+    is_recording = status_5.get("active", False)
+
+    col_status, col_refresh = st.columns([4, 1])
+    with col_status:
+        if is_recording:
+            st.error(f"🔴 Recording in progress (PID {status_5.get('pid')})")
+        else:
+            st.success("⚪ Not recording")
+    with col_refresh:
+        if st.button("🔄 Refresh", key="btn_stage5_refresh"):
+            st.rerun()
+
+    if st.button("🔍  List devices", key="btn_stage5_devices"):
+        ok, logs, devices = _run(list_devices)
+        _show_log(logs, ok)
+        if ok:
+            st.session_state["stage5_devices"] = devices
+
+    devices_5 = st.session_state.get("stage5_devices")
+    video_choices = {f'{d["idx"]} — {d["name"]}': d["idx"] for d in devices_5["video"]} if devices_5 else {}
+    audio_choices = {f'{d["idx"]} — {d["name"]}': d["idx"] for d in devices_5["audio"]} if devices_5 else {}
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        output_5 = st.text_input("Output path", value="recording.webm", key="t5_output",
+                                  disabled=is_recording)
+        if video_choices:
+            video_idx_5 = video_choices[st.selectbox("Video device", list(video_choices),
+                                                       key="t5_video_sel", disabled=is_recording)]
+        else:
+            video_idx_5 = st.text_input("Video device index", value="1", key="t5_video_idx",
+                                         help="List devices above to see indices — \"1\" is usually \"Capture screen 0\"",
+                                         disabled=is_recording)
+        if audio_choices:
+            audio_idx_5 = audio_choices[st.selectbox("Audio device", list(audio_choices),
+                                                       key="t5_audio_sel", disabled=is_recording)]
+        else:
+            audio_idx_5 = st.text_input("Audio device index", value="0", key="t5_audio_idx",
+                                         disabled=is_recording)
+    with col_b:
+        framerate_5 = st.number_input("Framerate (fps)", value=30, min_value=1, max_value=60,
+                                       key="t5_framerate", disabled=is_recording)
+        bitrate_5 = st.text_input("Audio bitrate", value=AUDIO_BITRATE, key="t5_bitrate",
+                                   disabled=is_recording)
+
+    col_start, col_stop = st.columns(2)
+    with col_start:
+        if st.button("⏺️  Start Recording", key="btn_stage5_start", disabled=is_recording,
+                     use_container_width=True):
+            ok, logs, result = _run(
+                start_recording,
+                output_path=output_5,
+                video_idx=str(video_idx_5),
+                audio_idx=str(audio_idx_5),
+                framerate=int(framerate_5),
+                audio_bitrate=bitrate_5,
+            )
+            _show_log(logs, ok and not (result or {}).get("error"))
+            st.rerun()
+    with col_stop:
+        if st.button("⏹️  Stop Recording", key="btn_stage5_stop", disabled=not is_recording,
+                     use_container_width=True):
+            ok, logs, result = _run(stop_recording)
+            _show_log(logs, ok and not (result or {}).get("error"))
+            st.rerun()
+
+    if not is_recording and Path(output_5).exists():
+        st.subheader("Last recording")
+        p5 = Path(output_5)
+        if p5.suffix.lower() in (".mp4",):
+            st.video(str(p5))
+        else:
+            st.caption(f"`{p5}` — {p5.stat().st_size/1_048_576:.1f} MB "
+                       f"(convert to `.mp4` via Stage 0 to preview here)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 6: One-Shot WebM + Transcript → Synced MP4
+# ─────────────────────────────────────────────────────────────────────────────
+with tab6:
+    st.header("Stage 6 — WebM + Transcript → Synced MP4 (one-shot)")
+    st.info(
+        "Skips the intermediate files: takes a raw `.webm` recording (from Stage 4 or 5) "
+        "plus a transcript, generates TTS per segment, places each segment at its own "
+        "transcript timestamp (no uniform tempo-stretching), and merges straight to a "
+        "synced MP4 — combining Stages 0 + 2 + 3 into one run."
+    )
+
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.subheader("Files")
+        webm_6 = st.text_input("Input .webm", value="recording.webm", key="t6_webm")
+        transcript_6 = st.text_input("Transcript (raw or formatted)", value=RAW_TRANSCRIPT,
+                                      key="t6_transcript")
+        output_6 = st.text_input("Output .mp4", value="output_synced.mp4", key="t6_output")
+    with col_b:
+        st.subheader("Voice settings")
+        voice_6 = st.text_input("Voice ID", value=TTS_VOICE, key="t6_voice")
+        speed_6 = st.slider("Speed", 0.5, 2.0, TTS_SPEED, 0.05, key="t6_speed")
+        lang_6 = st.selectbox("Language", ["en-us", "en-gb", "ja", "zh", "ko", "fr", "de"],
+                               index=["en-us", "en-gb", "ja", "zh", "ko", "fr", "de"].index(TTS_LANG)
+                               if TTS_LANG in ["en-us", "en-gb", "ja", "zh", "ko", "fr", "de"] else 0,
+                               key="t6_lang")
+        wpm_6 = st.number_input("WPM (for raw transcripts)", value=WPM, min_value=60, max_value=400,
+                                 key="t6_wpm")
+        gap_6 = st.number_input("Gap between segments (seconds)", value=GAP_SEC,
+                                 min_value=0, max_value=10, key="t6_gap")
+    with col_c:
+        st.subheader("Encoding")
+        bitrate_6 = st.text_input("Audio bitrate", value=AUDIO_BITRATE, key="t6_bitrate")
+        sr_6 = st.number_input("Sample rate (Hz)", value=SAMPLE_RATE, step=1000, key="t6_sr")
+        preset_6 = st.selectbox("Video preset", ["fast", "medium", "slow"],
+                                 index=["fast", "medium", "slow"].index(VIDEO_PRESET),
+                                 key="t6_preset")
+        crf_6 = st.slider("CRF quality (lower = better)", 0, 51, int(VIDEO_CRF), key="t6_crf")
+
+    webm_6_ok = Path(webm_6).exists()
+    transcript_6_ok = Path(transcript_6).exists()
+    for label, fpath, ok_f in [("Input .webm", webm_6, webm_6_ok),
+                                ("Transcript", transcript_6, transcript_6_ok)]:
+        _, msg = _file_badge(fpath)
+        (st.success if ok_f else st.warning)(f"{label}: {msg}")
+
+    can_run_6 = webm_6_ok and transcript_6_ok
+    if st.button("▶️  Run One-Shot Sync", key="btn_stage6", disabled=not can_run_6):
+        with st.spinner("Converting, generating TTS, and syncing — this may take a while…"):
+            from webm_transcript_pipeline import webm_to_mp4
+            ok, logs, out_path = _run(
+                webm_to_mp4,
+                webm_path=webm_6,
+                transcript_path=transcript_6,
+                output_path=output_6,
+                voice=voice_6,
+                speed=speed_6,
+                lang=lang_6,
+                wpm=int(wpm_6),
+                gap_sec=int(gap_6),
+                audio_bitrate=bitrate_6,
+                sample_rate=int(sr_6),
+                video_preset=preset_6,
+                video_crf=str(crf_6),
+            )
+        _show_log(logs, ok)
+        if ok and out_path and Path(out_path).exists():
+            size_mb = Path(out_path).stat().st_size / 1_048_576
+            st.success(f"Created `{out_path}` ({size_mb:.1f} MB)")
+            st.video(str(out_path))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Status & Config
+# ─────────────────────────────────────────────────────────────────────────────
+with tab_status:
     st.header("Pipeline Status & Configuration")
 
     st.subheader("File status")
