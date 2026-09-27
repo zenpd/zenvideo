@@ -24,7 +24,7 @@ from config import (
 # ── Background music options (for Streamlit dropdown) ────────────────────────
 BG_MUSIC_OPTIONS = {
     "None"              : None,
-    "Corporate"         : "music/atlasaudio-corporate-491319.mp3",
+    "Corporate"         : "music/corporate.mp3",
     "Upbeat Corporate"  : "music/kornevmusic-upbeat-happy-corporate-487426.mp3",
     "Soft Background"   : "music/sigmamusicart-soft-background-music-468495.mp3",
     "Inspiring"         : "music/background.mp3",
@@ -73,6 +73,8 @@ def sync_and_merge(
  
     # ── Mix background music if provided ─────────────────────────────────────
     temp_audio = None
+    if bg_music and not os.path.exists(bg_music):
+        log(f"WARNING: background music file not found, skipping: {bg_music}")
     if bg_music and os.path.exists(bg_music):
         log(f"Mixing background music: {bg_music}")
         tts = AudioSegment.from_mp3(audio_path)

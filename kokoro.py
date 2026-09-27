@@ -69,10 +69,10 @@ for idx, (time_line, text_line) in enumerate(entries):
         audio_parts.append(gap_audio)
         
         elapsed = time.time() - start_time
-        print(f"✅ ({elapsed:.1f}s total)")
+        print(f"OK ({elapsed:.1f}s total)")
 
     except Exception as e:
-        print(f"❌ FAILED: {e}")
+        print(f"FAILED: {e}")
         audio_parts.append(gap_audio)
 
 # Combine all audio at once
@@ -94,5 +94,5 @@ if audio_parts:
     duration_sec = len(final_audio) / SAMPLE_RATE
     mins = int(duration_sec) // 60
     secs = int(duration_sec) % 60
-    print(f"\n✅ Done! final_audio.mp3 — {mins}:{secs:02d}")
+    print(f"\nDone! final_audio.mp3 - {mins}:{secs:02d}")
     print(f"Total time: {total_time:.1f}s")
