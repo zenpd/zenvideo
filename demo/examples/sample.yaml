@@ -1,0 +1,32 @@
+title: Acme Invoices
+url: sample_app.html
+voice: af_sky
+speed: 1.1
+fps: 30
+hide: ["#cookie-banner"]
+music:
+  file: ../../music/corporate.mp3
+  volume_db: -30
+
+segments:
+  - id: intro
+    say: "This is Acme Invoices. Let's create a new invoice for a customer."
+
+  - id: fill-form
+    say: "Fill in the customer name, the amount of $1,250, and the due date, then click Save."
+    actions:
+      - fill: { testid: customer-name, value: "Globex Corporation" }
+      - fill: { testid: amount, value: "1250.00" }
+      - fill: { testid: due-date, value: "2026-10-31" }
+      - click: { testid: save-invoice, at_word: "Save" }
+      - wait_for: { testid: saved-toast }
+
+  - id: saved
+    say: "The invoice is saved and sent for approval automatically."
+    hold: 0.5
+
+  - id: list
+    say: "Every invoice shows up in one list, ready to review."
+    actions:
+      - click: { testid: nav-list, at_word: "list" }
+      - scroll: { testid: invoice-list, by: 500, duration: 1.5 }

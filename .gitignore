@@ -17,3 +17,12 @@ __pycache__/
 .venv/
 
 video-recordings/
+
+# demo/ pipeline outputs, local models, saved logins
+build/
+models/
+auth/
+storage_state*.json
+# Studio web app
+studio/node_modules/
+studio/dist/

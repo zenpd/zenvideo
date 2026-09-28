@@ -6,7 +6,7 @@ kokoro-onnx
 # Audio processing
 pydub
 soundfile
-# audioop-lts
+audioop-lts; python_version >= "3.13"   # pydub needs it on Python 3.13+
 
 # Number conversion
 num2words
@@ -21,3 +21,16 @@ playwright
 
 # UI
 streamlit
+
+# Zen Studio server (api/main.py + api/studio.py)
+fastapi
+uvicorn
+sse-starlette
+python-multipart
+
+# demo/ pipeline (YAML script -> recording -> synced MP4)
+pyyaml
+numpy
+pillow
+onnx
+faster-whisper   # optional fallback for word timing; exact timing comes from the Kokoro model via onnx

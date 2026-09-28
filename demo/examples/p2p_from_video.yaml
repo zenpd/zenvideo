@@ -1,0 +1,175 @@
+# transcript.txt narration over the existing screen recording p2p.mp4.
+# Stage directions from the transcript became actions; `at` and `box` were measured from p2p.mp4
+# (frame-difference change points + cursor position in the frames right before each change).
+title: Procure-to-Pay Agentic Assistant
+source:
+  video: ../../p2p.mp4
+voice: af_sky
+speed: 1.1
+fps: 30
+music:
+  file: ../../music/corporate.mp3
+  volume_db: -30
+pacing:
+  lead_in: 1.0
+  gap: 0.7
+  tail: 1.5
+style:
+  zoom_max: 1.45
+  intro_subtitle: "Agentic assistant: end-to-end walkthrough"
+  outro_subtitle: "Requisition to accrual, in one conversation"
+
+segments:
+  - id: cold-open
+    span: [0.0, 22.0]
+    say: >-
+      Procure-to-pay is where enterprises quietly lose millions of hours. One purchase crosses a dozen disconnected
+      systems — Coupa, Oracle, SharePoint, Remedy — and a chain of hand-offs: raise the requisition, onboard the
+      supplier, sign the contract, cut the PO, receive goods, match the invoice, clear holds, pay, accrue, and report.
+      Every step is a form, an email, an approval, or a wait.
+    actions:
+      - focus: { at: 7.0, t_end: 19.0, box: [106, 360, 834, 440] }
+
+  - id: assistant
+    span: [22.0, 42.2]
+    say: >-
+      This is an agentic P2P assistant. You don't need to learn ten different screens — you just chat. Behind that
+      chat is a roster of specialist agents that run the entire procure-to-pay lifecycle, call the real systems of
+      record, and stop for a human exactly at the points that require approval. One conversation, from requisition
+      to accrual.
+    actions:
+      - scroll: { at: 28.8, t_end: 29.7, by: 400 }
+      - scroll: { at: 37.1, t_end: 37.8, by: -400 }
+
+  - id: agents
+    span: [42.2, 66.9]
+    say: >-
+      You can see that each stage has its own agent — Requisition, Supplier, Contract, PO, Goods Receipt, Invoice with
+      three-way match, Holds, Payment, Urgent Payments, Accruals, and Reporting — coordinated by a supervisor that
+      reads the user's intent and routes it to the appropriate specialist. They all read and write to the same case,
+      so the requisition you raise and the invoice you pay months later remain one connected thread, not eleven
+      separate silos.
+    actions:
+      - click: { role: link, name: Agents, at: 42.7, box: [1230, 22, 100, 40], zoom: false }
+      - scroll: { at: 47.5, t_end: 50.8, by: 900 }
+      - scroll: { at: 62.1, t_end: 62.7, by: -900 }
+
+  - id: raise-pr-type
+    span: [66.9, 74.0]
+    actions:
+      - click: { role: link, name: Chat, at: 67.1, box: [616, 22, 84, 40], zoom: false }
+      - fill: { role: textbox, at: 69.8, t_end: 72.5, box: [480, 964, 1230, 54],
+                value: "Create a PR for 500 laptops from Dell at $1,200 each" }
+      - click: { role: button, name: Send, at: 72.75, box: [1720, 966, 64, 52] }
+
+  - id: raise-pr
+    span: [74.0, 78.7]
+    say: >-
+      The assistant reads the intent and extracts the vendor, quantity, and amount. Because six hundred thousand
+      dollars is above the auto-approval ceiling, the assistant pauses and asks for approval directly in the chat.
+    actions:
+      - focus: { at: 74.2, t_end: 78.6, box: [488, 250, 850, 220] }
+
+  - id: approve-pr
+    span: [78.7, 91.2]
+    say: >-
+      Notice that the assistant now provides the next steps as one-tap action buttons. It's guiding the flow instead
+      of requiring the user to memorize the process.
+    actions:
+      - click: { role: button, name: Approve, at: 79.05, box: [498, 428, 118, 34], zoom: [480, 320, 900, 340] }
+      - focus: { at: 80.0, t_end: 90.9, box: [490, 480, 870, 180] }
+
+  - id: onboard-supplier
+    span: [91.2, 96.0]
+    say: >-
+      The supplier is onboarded against the document checklist. The contract is then drafted as a statement of work.
+    actions:
+      - click: { role: button, name: Onboard supplier, at: 91.4, box: [500, 608, 180, 36], zoom: [480, 560, 1380, 300] }
+      - click: { role: button, name: Sign the contract, at: 95.2, box: [500, 792, 180, 36], at_word: contract,
+                 zoom: [480, 640, 1380, 300] }
+
+  - id: sign-contract
+    span: [96.0, 105.3]
+    say: >-
+      Signing is always human-in-the-loop, so the assistant pauses again for approval.
+    actions:
+      - focus: { at: 96.2, t_end: 104.5, box: [490, 740, 1030, 160] }
+      - click: { role: button, name: Approve, at: 104.7, box: [500, 862, 118, 34], at_word: approval, ripple: false,
+                 zoom: [480, 700, 1380, 300] }
+
+  - id: create-po
+    span: [105.3, 112.2]
+    say: >-
+      Now the assistant asks to create the purchase order. The PO is created from the existing case.
+    actions:
+      - click: { role: button, name: Create the PO, at: 106.45, box: [500, 862, 160, 36], at_word: create,
+                 zoom: [480, 560, 1380, 500] }
+      - click: { role: button, name: Receive goods, at: 109.75, box: [498, 864, 166, 36], zoom: [480, 560, 1380, 500] }
+
+  - id: receive-invoice
+    span: [112.2, 115.5]
+    say: >-
+      The invoice goes through a real three-way match between the purchase order, goods receipt, and invoice amount.
+      The match clears successfully. If it did not, the system would raise a hold and route it to the appropriate
+      business owner.
+    actions:
+      - click: { role: button, name: Process invoice, at: 112.45, box: [498, 864, 170, 36], zoom: [480, 560, 1380, 500] }
+      - focus: { at: 114.2, t_end: 115.4, box: [490, 736, 920, 170] }
+
+  - id: payment-accrual
+    span: [115.5, 129.0]
+    say: >-
+      Payment is scheduled and then settles during the next payment check. The monthly accrual for finance close is
+      drafted and confirmed with one tap. The report is generated and logged. From requisition to accrual, the entire
+      process happens through one conversation in about a minute.
+    actions:
+      - click: { role: button, name: Check payment, at: 115.7, box: [498, 864, 174, 36], zoom: [480, 560, 1380, 500] }
+      - click: { role: button, name: Log accrual, at: 121.85, box: [654, 864, 148, 36], at_word: accrual,
+                 zoom: [480, 560, 1380, 500] }
+      - click: { role: button, name: Approve, at: 123.45, box: [500, 862, 120, 36], at_word: confirmed,
+                 zoom: [480, 560, 1380, 500] }
+      - click: { role: button, name: Monthly report, at: 126.2, box: [498, 864, 174, 36], at_word: report,
+                 zoom: [480, 560, 1380, 500] }
+
+  - id: governance
+    span: [129.0, 151.6]
+    say: >-
+      Two things make this usable, not just clever. First, it converges. If you ask for a purchase order before a
+      contract exists, the assistant does not simply stop. It tells you which cases are ready and what you need to do
+      next. Second, control stays with people. Every real decision stops for human approval, and every decision is
+      written to the governance log.
+    actions:
+      - click: { role: link, name: Governance, at: 133.2, box: [1360, 22, 140, 40], zoom: false }
+      - focus: { at: 136.5, t_end: 142.0, box: [120, 160, 700, 420] }
+      - focus: { at: 144.5, t_end: 151.0, box: [850, 150, 940, 400] }
+
+  - id: architecture
+    span: [151.6, 173.3]
+    say: >-
+      This isn't a toy. The agents call Coupa, Oracle, SharePoint, and Remedy through the same interfaces used by the
+      real systems, so production endpoints can be configured without changing the overall workflow. State lives in a
+      shared datastore, so a conversation can survive a restart and scale across multiple replicas. Long-running
+      approvals are modeled as durable workflows, with a fallback so the assistant never simply stops.
+    actions:
+      - click: { role: link, name: Architecture, at: 151.8, box: [1060, 22, 140, 40], zoom: false }
+      - scroll: { at: 156.0, t_end: 162.1, by: 1200 }
+      - scroll: { at: 164.3, t_end: 170.7, by: -1200 }
+
+  - id: observability
+    span: [173.3, 188.5]
+    say: >-
+      Every agent step and model call is also traced in Arize Phoenix. You can see which agent ran, what it decided,
+      the latency, and the token usage. There is also a live activity feed and a data-lineage view inside the
+      application. When something looks wrong, you don't have to guess. Open the trace and scroll down to inspect the
+      details.
+    actions:
+      - click: { role: link, name: Observability, at: 173.5, box: [1530, 22, 120, 40], zoom: false }
+      - scroll: { at: 179.4, t_end: 184.4, by: 600, box: [140, 640, 1640, 430], at_word: live activity feed }
+
+  - id: close
+    span: [188.5, 197.6]
+    say: >-
+      Procure-to-pay — eleven agents, every system of record, every approval, and one conversation. The back-office
+      process nobody wants to run, run for you.
+    actions:
+      - click: { role: link, name: Dashboard, at: 188.7, box: [440, 22, 156, 40], zoom: false }
