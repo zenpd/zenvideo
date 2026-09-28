@@ -159,6 +159,29 @@ FRESH_KINDS = {"click", "hover", "wait_for"}
 FRESH_FALLBACK_S = (10.0, 6.0)     # accept an older element after this long a wait, once the page is this quiet
 
 
+# The click right after typing is usually "send". Drafts often find that button by the text box's placeholder, which
+# changes with the app's state ("Start a conversation first" -> "Ask me anything..."), so if the target doesn't show
+# up quickly, use the button next to the box that was just typed into - or press Enter in it.
+SEND_FALLBACK_S = 5.0
+FIND_SEND_BUTTON = """(inp) => {
+  document.querySelectorAll('[data-zv-send]').forEach((e) => e.removeAttribute('data-zv-send'));
+  const usable = (b) => b && b.offsetParent !== null && !b.disabled;
+  const after = (b) => inp.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING;
+  const pick = (b) => { b.setAttribute('data-zv-send', ''); return true; };
+  const form = inp.form || inp.closest('form');
+  if (form) {
+    const b = [...form.querySelectorAll('button, [role=button], input[type=submit]')].find(usable);
+    if (b) return pick(b);
+  }
+  let box = inp.parentElement;
+  for (let i = 0; i < 4 && box; i++, box = box.parentElement) {
+    const b = [...box.querySelectorAll('button, [role=button]')].find((b) => usable(b) && after(b));
+    if (b) return pick(b);
+  }
+  return false;
+}"""
+
+
 class ActionError(RuntimeError):
     pass
 
@@ -296,6 +319,8 @@ class Recorder:
         return best if best_score >= 0.5 else None
 
     kind: str | None = None   # kind of the action being run (set by run())
+    prev_kind: str | None = None
+    last_input = None         # element handle of the last text box typed into (for the send-button fallback)
 
     def _settled(self, since: float) -> bool:
         """Waited at least FRESH_FALLBACK_S[0] since `since` and the page has not changed for FRESH_FALLBACK_S[1]."""
@@ -337,6 +362,14 @@ class Recorder:
                     loc = self._base(t, fresh)
                     continue
                 fuzzy_after = now() + 2.0
+            if t.placeholder is not None and n == 0 and now() - t_start > SEND_FALLBACK_S:
+                # Placeholders describe the app's state ("Start a conversation first"), so they go stale; the box
+                # meant is the page's main text box (the last visible one, as in a chat).
+                self.log(f"      {where}: no text box with placeholder {t.placeholder!r} (it changes with the app's "
+                         f"state) - using the main text box")
+                t = Target(role="textbox", nth="last")
+                loc = self._base(t)
+                continue
             if fresh and n == 0 and self._settled(t_start) and self._base(t).count():
                 fresh = False
                 self.log(f"      {where}: no new {t.describe()} appeared - using the latest one already on screen")
@@ -390,7 +423,7 @@ class Recorder:
         timeout = float(a.params.get("timeout", self.pacing["action_timeout"]))
         where = f"{a.where} [{a.kind}]"
         self.check_focus()
-        self.kind = a.kind
+        self.prev_kind, self.kind = self.kind, a.kind
         try:
             getattr(self, f"_do_{a.kind}")(a, timeout, where)
         except ActionError:
@@ -411,7 +444,21 @@ class Recorder:
         self.page.evaluate(CURSOR_HIDE_LATER, CURSOR_LINGER_MS)
 
     def _do_click(self, a: Action, timeout: float, where: str) -> None:
-        el = self.locate(a.target, timeout, need_enabled=True, where=where)
+        send_step = self.prev_kind == "fill" and self.last_input is not None
+        try:
+            el = self.locate(a.target, min(timeout, SEND_FALLBACK_S) if send_step else timeout, need_enabled=True,
+                             where=where)
+        except ActionError:
+            if not send_step:
+                raise
+            if not self.last_input.evaluate(FIND_SEND_BUTTON):
+                self.log(f"      {where}: no {a.target.describe()} - pressing Enter in the text box instead")
+                t = now()
+                self.last_input.press("Enter")
+                self.event("press", t, key="Enter")
+                return
+            self.log(f"      {where}: no {a.target.describe()} - using the button next to the text box")
+            el = self.page.locator("[data-zv-send]").last
         box = self._box(el, where)
         self.cursor_show()
         x, y = self.glide_to_box(box)
@@ -443,6 +490,7 @@ class Recorder:
             el.fill(value)
         else:
             el.press_sequentially(value, delay=self.pacing["typing_ms"])
+        self.last_input = el.element_handle(timeout=5000)
         self.event("type", t, t_end=now(), chars=len(value), **self._target_fields(a, box))
 
     def _do_hover(self, a: Action, timeout: float, where: str) -> None:

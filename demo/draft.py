@@ -84,8 +84,11 @@ Rules:
   Use it when the narration names what is being clicked or shown. Never use a word that is not in that say.
 - 'scroll down / scroll through a list the narration walks through' -> prefer scroll_to on the item being named,
   from at_word to until_word, so the page follows the voice. Plain page scrolling -> scroll with by 600-1200.
-- Unlabelled icon buttons: use {"role": "button", "name": <title from app_scan '[title] ...'>} or a css selector
-  built from the scan (e.g. "input[placeholder*='Ask'] + button" for a send button next to the chat box).
+- Unlabelled icon buttons: use {"role": "button", "name": <title/aria-label from app_scan '[title] ...'>}.
+  To send what was typed into a chat box, use that button's label if the scan shows one, otherwise {"press": "Enter"}.
+  Never build a selector from placeholder text: placeholders change with the app's state (a chat box can say "Start a
+  conversation first" before a chat exists and "Ask me anything" after), so the selector stops matching. Type into a
+  chat box with {"fill": {"role": "textbox", "nth": "last", "value": ...}}.
 - Return only the JSON object."""
 
 
@@ -167,11 +170,26 @@ def _strip_directions(say: str) -> tuple[str, list[str]]:
     return re.sub(r",\s*$", ".", text), removed
 
 
+def _is_send(actions: list[dict], fill_action: dict) -> bool:
+    """True when this typing is a chat message: the next action presses Enter or clicks a button / css target."""
+    if "fill" not in fill_action or fill_action not in actions:
+        return False
+    k = actions.index(fill_action)
+    nxt = actions[k + 1] if k + 1 < len(actions) else None
+    if not isinstance(nxt, dict):
+        return False
+    if nxt.get("press") in ("Enter", {"key": "Enter"}):
+        return True
+    click = nxt.get("click")
+    return isinstance(click, dict) and (click.get("css") is not None or click.get("role") == "button")
+
+
 def sanitize(doc: dict) -> list[str]:
     """Deterministic clean-up of the model's common slips:
     - stage directions left inside 'say' (they would be spoken) are removed
     - word anchors that don't occur in their own segment's narration are dropped (the action still runs in order)"""
     fixes = []
+    chatting = False   # set once a chat message was sent: from then on repeated buttons mean the newest reply's
     for i, seg in enumerate(doc.get("segments") or [], start=1):
         if not isinstance(seg, dict):
             continue
@@ -185,9 +203,8 @@ def sanitize(doc: dict) -> list[str]:
                 seg.pop("say")
         say = seg.get("say")
         toks = tokens(spoken(say)) if isinstance(say, str) and say.strip() else []
-        for action in seg.get("actions") or []:
-            if not isinstance(action, dict):
-                continue
+        actions = [a for a in seg.get("actions") or [] if isinstance(a, dict)]
+        for action in actions:
             fill = action.get("fill")
             if isinstance(fill, dict):
                 for k in [k for k, v in fill.items() if v is None]:
@@ -195,6 +212,18 @@ def sanitize(doc: dict) -> list[str]:
                 if not any(k in fill for k in ("testid", "role", "text", "label", "placeholder", "css")):
                     fill.update(role="textbox", nth="last")
                     fixes.append(f"segment {i}: typing had no target - using the last text box on the page")
+                elif "placeholder" in fill and _is_send(actions, action):
+                    old_ph = fill.pop("placeholder")
+                    fill.update(role="textbox", nth="last")
+                    fixes.append(f"segment {i}: chat box found by placeholder {old_ph!r} (it changes with the app's "
+                                 f"state) - using the last text box on the page")
+                if _is_send(actions, action):
+                    chatting = True
+            for kind in ("click", "wait_for", "hover"):
+                body = action.get(kind)
+                if chatting and isinstance(body, dict) and body.get("role") == "button" and "nth" not in body:
+                    body["nth"] = "last"   # chat buttons repeat in every reply: always the newest one
+                    fixes.append(f"segment {i}: {kind} {body.get('name')!r} - using the newest one (nth: last)")
             for kind in ("click", "wait_for", "hover"):
                 body = action.get(kind)
                 if isinstance(body, dict) and body.get("nth") == "last" and float(body.get("timeout") or 0) < 120:
