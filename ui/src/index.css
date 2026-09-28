@@ -98,3 +98,25 @@
     @apply absolute inset-0 bg-shimmer bg-[length:400px_100%] animate-shimmer;
   }
 }
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+.sidebar-link {
+  @apply relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium
+         text-gray-500 hover:bg-zen-50 hover:text-zen-700 transition-all duration-150;
+}
+.sidebar-link.active {
+  @apply bg-gradient-zen-soft text-zen-700 font-semibold shadow-sm;
+}
+.sidebar-link.active::before {
+  content: '';
+  @apply absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-gradient-zen rounded-r-full;
+}
+.sidebar-link svg {
+  @apply flex-shrink-0 opacity-60 transition-opacity;
+}
+.sidebar-link.active svg {
+  @apply opacity-100 text-zen-600;
+}
+.sidebar-link:hover svg {
+  @apply opacity-90;
+}

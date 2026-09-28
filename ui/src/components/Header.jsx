@@ -1,29 +1,44 @@
-import { Clapperboard, ExternalLink } from 'lucide-react'
+import { Search, ExternalLink, X } from 'lucide-react'
 
-export function Header() {
+export function Header({ title, subtitle, search = '', onSearchChange, online }) {
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-20 h-[60px]
+      className="fixed top-0 left-[240px] right-0 z-20 h-[60px]
                  bg-white/90 backdrop-blur-sm border-b border-gray-100 shadow-header
-                 flex items-center justify-between px-6"
+                 flex items-center justify-between px-6 gap-4"
     >
-      {/* Brand */}
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-gradient-zen flex items-center justify-center shadow-sm">
-          <Clapperboard className="w-4.5 h-4.5 text-white" size={18} />
-        </div>
-        <div>
-          <h1 className="text-sm font-bold text-gray-900 leading-tight">
-            ZenVideoMaker(TTS, Video + Audio Merger)
-          </h1>
-          <p className="text-[11px] text-gray-400 leading-tight hidden sm:block">
-            powered by ZenLabs
-          </p>
-        </div>
+      {/* Page title */}
+      <div className="min-w-0">
+        {title && <h1 className="text-sm font-semibold text-gray-900 truncate">{title}</h1>}
+        {subtitle && <p className="text-xs text-gray-400 truncate">{subtitle}</p>}
       </div>
 
-      {/* Right side */}
-      <div className="flex items-center gap-3">
+      {/* Right controls */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+
+        {/* Search / filter stages */}
+        {onSearchChange && (
+          <div className="relative hidden md:flex items-center">
+            <Search size={14} className="absolute left-3 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Filter stages…"
+              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg
+                w-52 outline-none focus:border-zen-400 focus:ring-2 focus:ring-zen-100 transition-all"
+            />
+            {search && (
+              <button
+                onClick={() => onSearchChange('')}
+                className="absolute right-2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
         <a
           href="http://localhost:8000/docs"
           target="_blank"
@@ -35,7 +50,7 @@ export function Header() {
         </a>
 
         <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
-          <span className="live-dot" />
+          <span className={online === false ? 'w-2 h-2 rounded-full bg-rose-400 inline-block' : 'live-dot'} />
           <span>API</span>
         </div>
       </div>

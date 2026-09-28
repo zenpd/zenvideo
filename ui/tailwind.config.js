@@ -25,6 +25,7 @@ export default {
       boxShadow: {
         'card':         '0 1px 3px 0 rgba(0,0,0,.06), 0 1px 2px -1px rgba(0,0,0,.06)',
         'card-hover':   '0 8px 24px -4px rgba(79,70,229,.18), 0 2px 8px -2px rgba(0,0,0,.08)',
+        'sidebar':      '1px 0 0 #e5e7eb',
         'header':       '0 1px 0 #e5e7eb',
         'glow-zen':     '0 0 16px 2px rgba(99,102,241,.35)',
         'glow-emerald': '0 0 12px 2px rgba(16,185,129,.30)',
