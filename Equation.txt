@@ -1,0 +1,33 @@
+Problem
+AS/400 applications have evolved over decades, making even small changes difficult and time-consuming. Developers often spend significant effort identifying impacted programs, files, business rules, and dependencies before making a change, and many organizations still depend on tribal knowledge to understand how the system works.
+
+That's where AI Equation Intel helps. It automatically analyzes RPG, CL, and DDS source code, maps dependencies, extracts business logic, performs impact analysis, and even generates modernization-ready code, helping teams deliver changes faster and with greater confidence.
+
+
+Dashboard 
+This is the dashboard page — the entry point to an agentic pipeline built on five specialized agents. Let's upload the AS/400 folder — RPG, CL, and DDS together — and watch it run.
+
+AST Summary
+This is the AST Summary — every program broken down into its real fields, paragraphs, and statements, parsed straight from the source, column-exact.
+
+Business Rules
+Business Rules turns decades of buried logic into plain English — anyone can understand what the code enforces, without ever reading RPG.
+
+Dependency Graph
+The Dependency Graph gives you the bird's-eye view no developer has today — every interconnected program and file, at a glance. Before you touch anything, you know exactly what else it's connected to, so a change never breaks something you never knew existed.
+
+Ask KB 
+Ask Knowledge Base replaces that one retiring expert — ask a plain question, get an answer grounded in the real code, with the exact program cited, so you're never trusting a hallucination, only a traceable fact.
+
+Design Draft
+This is where it earns its keep. The user writes a requirement in plain English, and the AI reads it, then selects exactly which programs it touches — nothing stops you from overriding that selection yourself. Run Impact Analysis, and it comes back with a risk card — what could break, what to watch, before a single line is written. Pick your own design template, your team's format, not a generic one, and generate the draft. Scroll down, and there's the Dependency and Referential Integrity Impact section — every program sharing the same file is named explicitly, not buried in prose. The draft itself carries real code snippets, Mermaid diagrams of the actual data flow, and closes with References — every fact traced back to the exact program it came from.
+
+
+Code Generation 
+Code Generation starts the same way — a requirement in plain English. The AI selects which programs it touches, but the developer stays in control, adding or removing any module before moving on. From there, it drafts a design plan — what will change, and why — and nothing proceeds until a human approves it. That approval isn't a formality; it's the one gate that keeps AI-generated change safe to ship. Only after approval does it generate the actual code, and then lays it side by side against the existing program for direct comparison.
+
+Code Review
+Code Review works just as directly. Select a program, run the review, and it comes back with a risk level — high, medium, or low — the existing code laid out with the problem pinpointed, and two levels of fix: a suggested fix, and an optimized version for when performance is the priority. Nothing generic — every suggestion is tied to that program's own logic.
+
+Closing 
+AI Equation Intel — from legacy AS/400 code nobody fully understands anymore, to change every developer can confidently trust and ship.

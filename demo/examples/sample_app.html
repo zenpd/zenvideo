@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Acme Invoices</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 "Segoe UI", system-ui, sans-serif; background: #f4f6fb; color: #1d2433; }
+  header { display: flex; align-items: center; gap: 28px; padding: 18px 40px; background: #1f3a8a; color: #fff; }
+  header h1 { font-size: 20px; margin: 0 24px 0 0; }
+  nav button { background: none; border: 0; color: #c7d2fe; font: inherit; padding: 6px 2px; cursor: pointer; }
+  nav button[aria-selected="true"] { color: #fff; border-bottom: 2px solid #fff; }
+  main { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
+  .card { background: #fff; border-radius: 12px; padding: 28px 32px; box-shadow: 0 2px 12px rgba(20,30,60,.08); }
+  label { display: block; font-weight: 600; margin: 18px 0 6px; }
+  input { width: 100%; padding: 12px 14px; border: 1px solid #cbd3e1; border-radius: 8px; font: inherit; }
+  .row { display: flex; gap: 20px; } .row > div { flex: 1; }
+  .btn { margin-top: 24px; background: #2563eb; color: #fff; border: 0; border-radius: 8px; padding: 12px 22px; font: inherit; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: #1d4ed8; }
+  .toast { margin-top: 20px; padding: 14px 18px; border-radius: 8px; background: #dcfce7; color: #14532d; display: none; }
+  .list { max-height: 520px; overflow-y: auto; }
+  .item { padding: 16px 4px; border-bottom: 1px solid #eef1f6; display: flex; justify-content: space-between; }
+  .cookie { position: fixed; bottom: 0; left: 0; right: 0; background: #111; color: #fff; padding: 16px; text-align: center; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Acme Invoices</h1>
+  <nav>
+    <button data-testid="nav-new" aria-selected="true" onclick="show('new')">New invoice</button>
+    <button data-testid="nav-list" aria-selected="false" onclick="show('list')">All invoices</button>
+  </nav>
+</header>
+<main>
+  <section id="view-new" class="card">
+    <h2>New invoice</h2>
+    <label for="customer">Customer name</label>
+    <input id="customer" data-testid="customer-name" placeholder="e.g. Globex">
+    <div class="row">
+      <div><label for="amount">Amount</label><input id="amount" data-testid="amount" placeholder="0.00"></div>
+      <div><label for="due">Due date</label><input id="due" data-testid="due-date" placeholder="YYYY-MM-DD"></div>
+    </div>
+    <button class="btn" data-testid="save-invoice" onclick="save()">Save invoice</button>
+    <div class="toast" id="toast" data-testid="saved-toast">Invoice saved and sent for approval.</div>
+  </section>
+  <section id="view-list" class="card" hidden>
+    <h2>All invoices</h2>
+    <div class="list" id="list" data-testid="invoice-list"></div>
+  </section>
+</main>
+<div class="cookie" id="cookie-banner">We use cookies. <button>OK</button></div>
+<script>
+  function show(v) {
+    for (const k of ['new', 'list']) {
+      document.getElementById('view-' + k).hidden = k !== v;
+      document.querySelector(`[data-testid=nav-${k}]`).setAttribute('aria-selected', k === v);
+    }
+  }
+  function save() {
+    setTimeout(() => { document.getElementById('toast').style.display = 'block'; }, 900);
+  }
+  const list = document.getElementById('list');
+  const names = ['Initech', 'Umbrella', 'Hooli', 'Stark Industries', 'Wayne Enterprises', 'Wonka', 'Cyberdyne',
+                 'Soylent', 'Tyrell', 'Massive Dynamic', 'Aperture', 'Black Mesa', 'Vandelay', 'Pied Piper'];
+  names.forEach((n, i) => {
+    list.insertAdjacentHTML('beforeend',
+      `<div class="item"><span>INV-${1040 + i} &middot; ${n}</span><strong>$${(1200 + i * 315).toLocaleString()}</strong></div>`);
+  });
+</script>
+</body>
+</html>

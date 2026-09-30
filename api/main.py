@@ -415,6 +415,19 @@ def run_stage6(body: Stage6Config):
     return {"job_id": _start_job(webm_to_mp4, body.model_dump())}
 
 
+# ── ZenVideo Studio (API + built web app) ────────────────────────────────────
+# Mounted after the Stage 0-6 pipeline routes above: FastAPI matches routes in
+# registration order, and StaticFiles("/") is a catch-all, so it must come last
+# or it would shadow every /api/stage/* route declared before it.
+
+from api.studio import router as studio_router  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+app.include_router(studio_router)
+_studio_dist = ROOT / "studio" / "dist"
+if _studio_dist.exists():
+    app.mount("/", StaticFiles(directory=_studio_dist, html=True), name="studio")
+
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
