@@ -153,7 +153,10 @@ MUTATION_WATCH = """() => {
 # Just before each click / key press every element on the page is stamped "old", and a clicked element is stamped
 # "used". A chat-style target (nth: last) then only matches elements that appeared after the previous click and were
 # never clicked; if none turns up and the page has settled, an old-but-unused one is accepted.
-STAMP_OLD = "() => { for (const e of document.querySelectorAll('body *')) e.setAttribute('data-zv-old', ''); }"
+STAMP_OLD = """() => {
+  for (const e of document.querySelectorAll('body *')) e.setAttribute('data-zv-old', '');
+  window.__zvOldText = document.body ? document.body.innerText : '';   // what the page said before the click
+}"""
 MARK_USED = "(e) => e.setAttribute('data-zv-used', '')"
 FRESH_KINDS = {"click", "hover", "wait_for"}
 FRESH_FALLBACK_S = (10.0, 6.0)     # accept an older element after this long a wait, once the page is this quiet
@@ -180,6 +183,50 @@ FIND_SEND_BUTTON = """(inp) => {
   }
   return false;
 }"""
+
+
+# Drafts sometimes use HTML tag names as ARIA roles; the accessible role of a text field is "textbox".
+ROLE_ALIASES = {"input": "textbox", "textarea": "textbox", "text": "textbox", "textfield": "textbox",
+                "text field": "textbox", "field": "textbox"}
+TEXT_FIELD_ROLES = {"textbox", "searchbox", "combobox"}
+# Visible, typeable fields, for when nothing else identifies the one meant.
+TEXT_FIELDS_CSS = ("input:not([type]), input[type=text], input[type=search], input[type=email], input[type=tel], "
+                   "input[type=url], input[type=number], input[type=password], textarea, [contenteditable=true], "
+                   "[contenteditable='']")
+DATE_TYPES = {"date", "datetime-local", "month", "week", "time"}
+CALENDAR_ICON = re.compile(r"calendar|date ?picker|pick a date|choose date", re.I)
+FIND_SELECT_OPTION = """(want) => {
+  const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const w = norm(want);
+  document.querySelectorAll('[data-zv-select]').forEach((e) => e.removeAttribute('data-zv-select'));
+  for (const sel of document.querySelectorAll('select')) {
+    if (sel.disabled || sel.offsetParent === null) continue;
+    const opt = w && [...sel.options].find((o) => norm(o.label || o.text) === w || norm(o.value) === w);
+    if (opt) { sel.setAttribute('data-zv-select', ''); return opt.label || opt.text; }
+  }
+  return null;
+}"""
+# The element a user sees for a (usually hidden) file input: the nearest ancestor with a real size.
+VISIBLE_FOR_INPUT = """(e) => {
+  for (let n = e; n; n = n.parentElement) {
+    const r = n.getBoundingClientRect();
+    if (r.width > 20 && r.height > 20) return n;
+  }
+  return e;
+}"""
+
+
+def iso_date(value: str) -> str:
+    """Native date inputs only accept yyyy-mm-dd; accept the common ways people write a date."""
+    import datetime as _dt
+    v = value.strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%m/%d/%Y", "%d %B %Y", "%d %b %Y", "%B %d, %Y",
+                "%b %d, %Y", "%B %d %Y"):
+        try:
+            return _dt.datetime.strptime(v, fmt).date().isoformat()
+        except ValueError:
+            pass
+    return v
 
 
 class ActionError(RuntimeError):
@@ -283,7 +330,8 @@ class Recorder:
         if t.testid is not None:
             loc = p.get_by_test_id(t.testid)
         elif t.role is not None:
-            loc = p.get_by_role(t.role, name=t.name, exact=t.exact) if t.name else p.get_by_role(t.role)
+            role = ROLE_ALIASES.get(t.role.lower(), t.role)
+            loc = p.get_by_role(role, name=t.name, exact=t.exact) if t.name else p.get_by_role(role)
         elif t.text is not None:
             loc = p.get_by_text(t.text if t.exact else loose_text(t.text))
         elif t.label is not None:
@@ -318,6 +366,31 @@ class Recorder:
                     best, best_score = name, score
         return best if best_score >= 0.5 else None
 
+    def _text_field_alternative(self, t: Target) -> tuple[Locator, str] | None:
+        """A named text field that doesn't match by its role: the same name as a combobox/searchbox, by placeholder or
+        label, or - only when there is exactly one - the page's single visible text field (e.g. an unnamed textarea).
+        Only a single visible, enabled match counts, so an unrelated field is never picked."""
+        p = self.page
+
+        def one(loc: Locator) -> Locator | None:
+            loc = loc.filter(visible=True)
+            n = loc.count()
+            enabled = [loc.nth(i) for i in range(min(n, 5)) if loc.nth(i).is_enabled()]
+            return enabled[0] if len(enabled) == 1 else None
+
+        if t.name:
+            own = ROLE_ALIASES.get((t.role or "").lower(), t.role)
+            for role in sorted(TEXT_FIELD_ROLES - {own}):
+                if (el := one(p.get_by_role(role, name=t.name))) is not None:
+                    return el, f"the {role} named {t.name!r}"
+            if (el := one(p.get_by_placeholder(t.name))) is not None:
+                return el, f"the field with placeholder {t.name!r}"
+            if (el := one(p.get_by_label(t.name))) is not None:
+                return el, f"the field labelled {t.name!r}"
+        if (el := one(p.locator(TEXT_FIELDS_CSS))) is not None:
+            return el, "the only text field on the page"
+        return None
+
     kind: str | None = None   # kind of the action being run (set by run())
     prev_kind: str | None = None
     last_input = None         # element handle of the last text box typed into (for the send-button fallback)
@@ -337,6 +410,7 @@ class Recorder:
         t_start = now()
         deadline = now() + timeout
         fuzzy_after = now() + min(4.0, timeout / 2)
+        field_alt = ROLE_ALIASES.get((t.role or "").lower(), t.role) in TEXT_FIELD_ROLES
         warned = False
         while True:
             n = loc.count()
@@ -362,6 +436,12 @@ class Recorder:
                     loc = self._base(t, fresh)
                     continue
                 fuzzy_after = now() + 2.0
+            if field_alt and n == 0 and now() - t_start > min(4.0, timeout / 2):
+                field_alt = False
+                alt = self._text_field_alternative(t)
+                if alt is not None:
+                    self.log(f"      {where}: no {t.describe()} - using {alt[1]}")
+                    return alt[0]
             if t.placeholder is not None and n == 0 and now() - t_start > SEND_FALLBACK_S:
                 # Placeholders describe the app's state ("Start a conversation first"), so they go stale; the box
                 # meant is the page's main text box (the last visible one, as in a chat).
@@ -444,6 +524,18 @@ class Recorder:
         self.page.evaluate(CURSOR_HIDE_LATER, CURSOR_LINGER_MS)
 
     def _do_click(self, a: Action, timeout: float, where: str) -> None:
+        label = a.target.name or a.target.text
+        if label and not self._base(a.target).count():
+            # An option of a native <select> is not clickable page text: choose it with select_option instead.
+            option = self.page.evaluate(FIND_SELECT_OPTION, label)
+            if option:
+                self.log(f"      {where}: {label!r} is an option of a dropdown - selecting it")
+                self._select(self.page.locator("[data-zv-select]").first, option, a, where)
+                return
+            # Native date inputs are filled directly; their calendar icon is not needed (and often not clickable).
+            if CALENDAR_ICON.search(label) and self.page.locator("input[type=date]").filter(visible=True).count():
+                self.log(f"      {where}: skipping {label!r} - the date is typed straight into the native date field")
+                return
         send_step = self.prev_kind == "fill" and self.last_input is not None
         try:
             el = self.locate(a.target, min(timeout, SEND_FALLBACK_S) if send_step else timeout, need_enabled=True,
@@ -485,6 +577,13 @@ class Recorder:
         self.page.evaluate("([x, y]) => window.__vcursor && window.__vcursor.ripple(x, y)", [x, y])
         self.cursor_hide_later()
         value = str(a.params["value"])
+        input_type = el.evaluate("(e) => (e.type || '').toLowerCase()")
+        if input_type in DATE_TYPES:
+            # Native date/time pickers take a value, not keystrokes (yyyy-mm-dd for dates).
+            el.fill(iso_date(value) if input_type == "date" else value)
+            self.last_input = el.element_handle(timeout=5000)
+            self.event("type", t, t_end=now(), chars=len(value), **self._target_fields(a, box))
+            return
         el.fill("")
         if a.params.get("instant"):
             el.fill(value)
@@ -492,6 +591,99 @@ class Recorder:
             el.press_sequentially(value, delay=self.pacing["typing_ms"])
         self.last_input = el.element_handle(timeout=5000)
         self.event("type", t, t_end=now(), chars=len(value), **self._target_fields(a, box))
+
+    def _select(self, el: Locator, option: str, a: Action, where: str) -> None:
+        """Choose an option in a native <select> (select_option; the cursor still points at the dropdown)."""
+        box = self._box(el, where)
+        self.cursor_show()
+        x, y = self.glide_to_box(box)
+        t = now()
+        try:
+            el.select_option(label=option, timeout=5000)
+        except PlaywrightError:
+            el.select_option(value=option, timeout=5000)
+        self.page.evaluate("([x, y]) => window.__vcursor && window.__vcursor.ripple(x, y)", [x, y])
+        self.cursor_hide_later()
+        self.event("click", t, **self._target_fields(a, box))
+
+    def _do_select(self, a: Action, timeout: float, where: str) -> None:
+        el = self.locate(a.target, timeout, need_enabled=True, where=where)
+        option = str(a.params["option"])
+        if el.evaluate("(e) => e.tagName") == "SELECT":
+            self._select(el, option, a, where)
+            return
+        # A custom (non-native) dropdown: open it, then click the option.
+        box = self._box(el, where)
+        self.cursor_show()
+        self.glide_to_box(box)
+        el.click(timeout=5000)
+        opt = self.page.get_by_role("option", name=option).filter(visible=True)
+        if not opt.count():
+            opt = self.page.get_by_text(loose_text(option)).filter(visible=True)
+        opt = opt.first
+        obox = self._box(opt, where)
+        t = now()
+        x, y = self.glide_to_box(obox)
+        opt.click(timeout=5000)
+        self.page.evaluate("([x, y]) => window.__vcursor && window.__vcursor.ripple(x, y)", [x, y])
+        self.cursor_hide_later()
+        self.event("click", t, **self._target_fields(a, obox))
+
+    def _do_upload(self, a: Action, timeout: float, where: str) -> None:
+        """Attach a file to a file input. Upload areas are usually a styled box over a hidden <input type=file>, so the
+        file goes straight to the input; the cursor still moves to the visible area so the take shows the upload."""
+        path = a.params["path"]
+        inputs = self.page.locator("input[type=file]")
+        deadline = now() + timeout
+        while not inputs.count():
+            if now() > deadline:
+                raise ActionError(f"{where}: no file input on the page")
+            self.page.wait_for_timeout(150)
+        area = None
+        if a.target is not None:
+            try:
+                area = self.locate(a.target, min(timeout, 5.0), need_enabled=False, where=where)
+            except ActionError:
+                self.log(f"      {where}: no upload area {a.target.describe()} - attaching to the page's file input")
+                a = Action(kind=a.kind, target=None, params=a.params, at_word=a.at_word, where=a.where)
+        if area is not None:
+            if area.evaluate("(e) => e.tagName === 'INPUT' && e.type === 'file'"):
+                file_input, area = area, None
+            elif area.locator("input[type=file]").count():
+                file_input = area.locator("input[type=file]").first
+            else:
+                # The input whose visible box is closest to the upload area.
+                abox = area.bounding_box() or {"x": 0, "y": 0}
+                best = None
+                for i in range(inputs.count()):
+                    r = inputs.nth(i).evaluate_handle(VISIBLE_FOR_INPUT).as_element().bounding_box() or {"x": 1e9, "y": 1e9}
+                    d = abs(r["x"] - abox["x"]) + abs(r["y"] - abox["y"])
+                    best = (d, i) if best is None or d < best[0] else best
+                file_input = inputs.nth(best[1])
+        else:
+            file_input = inputs.first if inputs.count() == 1 else inputs.last
+        if area is None:
+            shown = file_input.evaluate_handle(VISIBLE_FOR_INPUT).as_element()
+            box = shown.bounding_box() if shown else None
+        else:
+            box = self._box(area, where)
+        t = now()
+        x = y = None
+        if box:
+            self.cursor_show()
+            x, y = self.glide_to_box(box)
+            self.page.evaluate("([x, y, w, h]) => window.__vcursor && window.__vcursor.highlight(x, y, w, h)",
+                               [box["x"], box["y"], box["width"], box["height"]])
+            self.page.wait_for_timeout(self.pacing["highlight_ms"])
+        file_input.set_input_files(path, timeout=timeout * 1000)
+        if box:
+            self.page.evaluate("([x, y]) => { window.__vcursor && (window.__vcursor.ripple(x, y), "
+                               "window.__vcursor.unhighlight()) }", [x, y])
+            self.cursor_hide_later()
+        self.log(f"      {where}: attached {Path(path).name}")
+        if box:
+            self.event("click", t, x=box["x"], y=box["y"], width=box["width"], height=box["height"],
+                       name=Path(path).name, zoom=a.params.get("zoom", True), action=a.where)
 
     def _do_hover(self, a: Action, timeout: float, where: str) -> None:
         el = self.locate(a.target, timeout, need_enabled=False, where=where)
@@ -598,10 +790,22 @@ class Recorder:
         """Wait for reply text that may be worded differently on screen than in the narration. Instead of failing the
         whole take, give up once the page has stopped changing (the reply is done) and let the next action decide."""
         self.page.evaluate(MUTATION_WATCH)
-        # Reply text: only in elements that appeared after the last click (an older reply may say the same thing).
+        # Reply text: in elements that appeared after the last click (an older reply may say the same thing), or text
+        # that wasn't on the page at the last click at all (a status line updated in place).
         loc = self._base_any(t).and_(self.page.locator(":not([data-zv-old])"))
+        pattern = re.compile(re.escape(t.text)) if t.exact else loose_text(t.text)
         t0 = now()
-        while not loc.count():
+
+        def appeared() -> bool:
+            if loc.count():
+                return True
+            before, after = self.page.evaluate(
+                "() => [window.__zvOldText === undefined ? null : window.__zvOldText, document.body.innerText]")
+            if before is None:
+                return bool(pattern.search(after))
+            return len(pattern.findall(after)) > len(pattern.findall(before))
+
+        while not appeared():
             waited = now() - t0
             quiet = self.page.evaluate("() => (performance.now() - window.__zvLastMut) / 1000")
             if (waited > SOFT_WAIT_MIN_S and quiet > SOFT_WAIT_QUIET_S) or waited > timeout:

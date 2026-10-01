@@ -1,0 +1,106 @@
+0. Problem Statement (2 minutes, no clicking — just talk)
+Before I walk you through the platform, let me explain the problem we're trying to solve.
+ 
+Most COBOL apps have been running for years, but the knowledge is buried in the code. When a change request comes in, the hard part isn't making the change, it's figuring out the application.
+ 
+Today, answering those questions often means spending hours through code or finding the person who knows the system.
+That's what we're solving: making application knowledge easy to access and impact analysis much faster.
+ 
+Let me walk you through the live demo."
+ 
+ 
+1. Dashboard
+Upload a COBOL application, including programs and copybooks, and the platform automatically parses everything, builds the call graph, extracts business rules, and creates a searchable knowledge base.
+ 
+Connected Intelligence Score / Business Rules Captured / Applications Connected
+
+Behind the scenes, the platform follows an agentic pipeline powered by LangGraph. 
+Ingestion Agent – Discovers application files and parses the COBOL source code.
+Analysis Agent – Extracts business rules, dependencies, CICS/SQL flows, batch jobs, and data flow relationships.
+Knowledge Base Agent – Creates chunks, generates embeddings, and builds the searchable knowledge base.
+Design Agent – Performs impact analysis and generates design drafts or reconciliation reports.
+Query Agent – Answers user questions using only the knowledge extracted from the codebase.
+"Together, these agents transform raw COBOL code into a connected intelligence layer."
+ 
+ 
+2. AST Summary
+"This shows we're not just scanning the code, we're actually parsing it into a complete structural tree.
+Every data item, paragraph, is captured in the program.
+This becomes the foundation for everything else, and all of it comes from the AST Parser"
+ 
+3. Batch (JCL)
+Most COBOL systems run through batch jobs.
+This page shows the actual JCL entry points, which job runs which program, in which step.
+That's critical for impact analysis because any program change, can affect downstream jobs.
+ 
+4. Online (CICS)
+"This is the online side, CICS transactions.
+It shows which programs are real CICS entry points that a user can actually trigger from a screen, and program-to-program calls
+ 
+5. Business Rules
+For key programs, we generate a plain-English explanation of what the code actually does.
+At the top is a business-level summary explaining the program's purpose.
+Below that, we break the logic into individual business rules and explain each condition.
+The Environment Summary shows how the program runs, whether it's batch or online, what data sources it uses, and its integrations.
+Even someone with limited COBOL experience can quickly understand the program.
+ 
+Dependency Graph
+This shows the application's actual call graph generated from the source code.
+ 
+Each node represents a program, with entry points highlighted so you can quickly see where execution starts.
+You can filter the graph to focus on specific program relationships.
+ 
+There's also a hierarchical view that shows how files and programs are connected across the application.
+ 
+This gives you a quick visual view of how everything is interconnected, making impact analysis much easier.
+One thing to note: everything you've seen so far comes directly from code parsing, not an LLM.
+That keeps AI costs low and improves accuracy by using structured facts instead of assumptions.
+ 
+6. Design Draft
+ 
+Step 1 — Type the Requirement
+"Please type any requirement."
+Step 2 — AI Suggests Relevant Programs
+"Watch this.
+The AI reads the requirement and suggests which programs are actually relevant. It's not a keyword guess, it's a real vector search over the knowledge base.
+You can add or remove programs before moving on.
+The AI proposes and human will decide.
+Step 3 — Click Run Impact Analysis
+"Please click on Run Impact Analysis.
+Suggested-program 
+This Suggested programs means a reviewer can sanity-check the AI's judgment before generating the draft
+ 
+Risk
+The AI only knows what these specific programs actually do, so the risks are specific to this change.
+This is the section a reviewer should read most carefully — it's the AI telling you what it's not sure about.
+ 
+Step 4 — Upload a Template (Optional, but Important)
+"Before generating, you can upload your own design document template, a .md or .txt file with your team's section headings and preferred structure.
+ the AI writes the draft using your template's exact structure, not some generic report layout."
+Click Generate Design Draft
+Now the platform generates the actual design draft, using only the facts discovered during impact analysis.
+ 
+As you scroll through the document, you'll see it's not just a text summary. It provides structured design information, impacted modules, suggested code change locations, and supporting code snippets.
+ 
+It also included flowcharts to help explain the proposed changes and their impact on the existing process, making it easier for both technical and business teams to review the design.
+ 
+And at the bottom, there's a References section. Every program used in the draft is linked directly back to its source file, so reviewers can verify exactly where the information came from."
+ 
+7. Knowledge Base (KB)
+This is the chat interface.
+Ask questions in plain English.
+The system first searches extracted facts and then uses AI to answer based only on those facts.
+Every answer includes citations and source references so you can verify it yourself.
+8. Design Reconciliation
+"This checks whether an existing design document still matches what the code actually does today.
+You upload the document, select the program, and the system compares the documented rule against the Program
+It flags three outcomes for every rule:
+Covered – the document matches the code.
+Conflict – the document says one thing, but the code does something different.
+Missing – the code contains behavior that was never documented.
+This helps identify stale documentation and undocumented logic.
+Closing
+"All of this runs automatically, the moment you upload the code.
+There's no manual tagging, no separate documentation project is require, 
+That's the M platform for you.
+Thank You

@@ -12,6 +12,7 @@ import json
 import math
 import os
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -242,12 +243,16 @@ def run_render(demo: Demo, lang: str, log=print, progress=None) -> None:
     outro = effects.card(out_w, out_h, style, demo.title, style["outro_subtitle"], "")
     blank = effects.card(out_w, out_h, style, "", "", "")
 
-    vf = "format=yuv420p" + (",ass=final.ass" if demo.subtitles.get("burn", True) else "")
+    # With no narration there are no cues: an empty .srt/.ass makes ffmpeg exit at once, so leave subtitles out.
+    has_subs = bool(cues)
+    if not has_subs:
+        log("No subtitle cues (no narration) - rendering without subtitles")
+    vf = "format=yuv420p" + (",ass=final.ass" if has_subs and demo.subtitles.get("burn", True) else "")
     args = [media.FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{out_w}x{out_h}", "-r", str(fps), "-i", "-",
             "-i", "narration.wav"]
     maps = ["-map", "0:v", "-map", "1:a"]
-    if demo.subtitles.get("soft", True):
+    if has_subs and demo.subtitles.get("soft", True):
         args += ["-i", "final.srt"]
         maps += ["-map", "2:s", "-c:s", "mov_text", "-metadata:s:s:0", f"language={ISO639_2.get(lang, 'und')}",
                  "-disposition:s:0", "0"]
@@ -261,6 +266,21 @@ def run_render(demo: Demo, lang: str, log=print, progress=None) -> None:
         f"{len(camera.keyframes) if camera else 0} camera keyframes, {len(clicks)} click ripples")
 
     encoder = subprocess.Popen(args, cwd=out_dir, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Drain ffmpeg's stderr while frames are piped in, so a chatty encoder can't block and its real error is kept.
+    err_chunks: list[bytes] = []
+    drain = threading.Thread(target=lambda: err_chunks.extend(iter(lambda: encoder.stderr.read(4096), b"")), daemon=True)
+    drain.start()
+
+    def encoder_error(context: str) -> media.MediaError:
+        try:
+            encoder.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            encoder.kill()
+        drain.join(timeout=5)
+        err = b"".join(err_chunks).decode(errors="replace").strip()
+        return media.MediaError(f"ffmpeg {context} (exit code {encoder.returncode}):\n"
+                                f"{err[-3000:] or '(ffmpeg printed no error message)'}")
+
     reader = FrameReader(video, src_w, src_h)
     last_key, last_bytes = None, b""
     t0 = time.perf_counter()
@@ -292,16 +312,21 @@ def run_render(demo: Demo, lang: str, log=print, progress=None) -> None:
                         img = Image.blend(outro, img, blend_out)
                     last_bytes = img.tobytes()
             last_key = key
-            encoder.stdin.write(last_bytes)
+            try:
+                encoder.stdin.write(last_bytes)
+            except OSError as e:   # BrokenPipeError, or EINVAL on Windows: ffmpeg has already exited
+                raise encoder_error(f"stopped while receiving frame {k} of {n_frames}") from e
             if progress and k % fps == 0:
                 progress(k / n_frames)
             if k and k % (fps * 20) == 0:
                 rate = k / (time.perf_counter() - t0)
                 log(f"  {k / fps:6.1f}s / {length:.1f}s  ({rate:.1f} fps, ~{(n_frames - k) / rate:.0f}s left)")
-        encoder.stdin.close()
-        err = encoder.stderr.read().decode(errors="replace")
+        try:
+            encoder.stdin.close()
+        except OSError as e:
+            raise encoder_error("failed while finishing the file") from e
         if encoder.wait() != 0:
-            raise media.MediaError(f"encoder failed:\n{err[-3000:]}")
+            raise encoder_error("failed")
     finally:
         reader.close()
         if encoder.poll() is None:

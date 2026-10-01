@@ -79,10 +79,20 @@ CURSOR_INIT_SCRIPT = r"""
 
         const cursor = document.createElement('div');
         cursor.id = '__vcursor';
-        cursor.innerHTML =
-            '<svg width="28" height="28" viewBox="0 0 24 24">' +
-            '<path d="M3 2l6.5 18 2.4-7.6L19 10z" fill="white" stroke="black" stroke-width="1.2" stroke-linejoin="round"/>' +
-            '</svg>';
+        // Built with DOM calls, not innerHTML: pages that enforce Trusted Types reject innerHTML assignments.
+        const SVG = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(SVG, 'svg');
+        svg.setAttribute('width', '28');
+        svg.setAttribute('height', '28');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        const path = document.createElementNS(SVG, 'path');
+        path.setAttribute('d', 'M3 2l6.5 18 2.4-7.6L19 10z');
+        path.setAttribute('fill', 'white');
+        path.setAttribute('stroke', 'black');
+        path.setAttribute('stroke-width', '1.2');
+        path.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(path);
+        cursor.appendChild(svg);
         document.documentElement.appendChild(cursor);
 
         const hl = document.createElement('div');
