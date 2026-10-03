@@ -34,6 +34,8 @@ LIVE_PARAMS = {
     "press": {"key"},
     "goto": {"url"},
     "wait": {"seconds"},
+    "select": {"option", "timeout"},       # native <select>: choose an option by its label (or value)
+    "upload": {"path", "timeout"},         # attach a file to a file input; the target (optional) is the upload area
 }
 SOURCE_PARAMS = {
     "click": {"ripple"},
@@ -45,7 +47,7 @@ SOURCE_PARAMS = {
     "focus": set(),
 }
 SOURCE_TIMING = {"at", "t_end", "box"}
-NEEDS_TARGET = {"click", "fill", "hover", "wait_for", "scroll_to"}
+NEEDS_TARGET = {"click", "fill", "hover", "wait_for", "scroll_to", "select"}
 NO_TARGET = {"press", "goto", "wait"}
 NEEDS_BOX = {"click", "fill", "hover", "focus"}
 NEEDS_END = {"focus"}
@@ -269,6 +271,10 @@ def _parse_action(raw, languages: list[str], where: str, source_mode: bool) -> A
     else:
         if kind == "fill" and "value" not in spec:
             raise _err(where, "fill needs a 'value'")
+        if kind == "select" and not str(spec.get("option") or "").strip():
+            raise _err(where, "select needs an 'option' (the visible label of the choice)")
+        if kind == "upload" and not str(spec.get("path") or "").strip():
+            raise _err(where, "upload needs a 'path' to the file to attach")
         if kind == "scroll" and "by" not in spec:
             raise _err(where, "scroll needs 'by' (pixels, negative scrolls up)")
         if kind == "wait_for" and spec.get("state", "visible") not in ("visible", "hidden"):
@@ -407,6 +413,13 @@ def load(path: str | Path, build_dir: str | Path | None = None) -> Demo:
             _parse_action(a, languages, f"{where}.actions[{j}]", source_mode)
             for j, a in enumerate(raw.get("actions") or [], start=1)
         ]
+        for a in actions:
+            if a.kind == "upload":
+                f = Path(os.path.expandvars(str(a.params["path"]))).expanduser()
+                f = f if f.is_absolute() else (base / f)
+                if not f.is_file():
+                    raise _err(a.where, f"upload: file not found on this machine: {f}")
+                a.params["path"] = str(f.resolve())
         seg = Segment(index=i, id=str(raw.get("id", f"seg{i:03d}")), say=say, actions=actions,
                       hold=float(raw.get("hold", 0.0)), span=span)
         last_at = span[0] if span else 0.0

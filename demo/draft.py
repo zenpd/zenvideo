@@ -36,8 +36,14 @@ SCAN_JS = r"""() => {
     headings: uniq(all('h1,h2,h3,h4').map(txt).map(t => t.slice(0, 80))),
     buttons: uniq(all('button,[role=button]').map(e => txt(e).slice(0, 60) || (e.title ? `[title] ${e.title}` : ''))),
     links: all('a[href]').map(a => ({text: txt(a).slice(0, 60), href: a.getAttribute('href')})).filter(l => l.text).slice(0, 60),
-    inputs: all('input:not([type=hidden]),textarea,[contenteditable=true]').map(e => ({
-      tag: e.tagName.toLowerCase(), placeholder: e.getAttribute('placeholder'), disabled: !!e.disabled})).slice(0, 20),
+    inputs: all('input:not([type=hidden]):not([type=file]),textarea,[contenteditable=true]').map(e => ({
+      tag: e.tagName.toLowerCase(), type: (e.type || '').toLowerCase(),
+      label: ((e.labels && e.labels[0] && e.labels[0].innerText) || e.getAttribute('aria-label') || e.name || '').trim().slice(0, 60),
+      placeholder: e.getAttribute('placeholder'), disabled: !!e.disabled})).slice(0, 30),
+    selects: all('select').map(e => ({
+      label: ((e.labels && e.labels[0] && e.labels[0].innerText) || e.getAttribute('aria-label') || e.name || '').trim().slice(0, 60),
+      options: [...e.options].map(o => (o.label || o.text).trim()).filter(Boolean).slice(0, 25)})).slice(0, 15),
+    file_inputs: document.querySelectorAll('input[type=file]').length,
     scroll_height: document.documentElement.scrollHeight, viewport: [innerWidth, innerHeight],
   };
 }"""
@@ -57,19 +63,29 @@ action: exactly one of
   {"wait_for":  {TARGET, "nth"?: "last", "timeout"?: s}}
   {"scroll":    {"by": pixels (negative = up), "at_word"?: word}}
   {"scroll_to": {TARGET, "exact"?: true, "align": "top"|"center", "at_word": word, "until_word": later word}}
+  {"select":    {TARGET of the dropdown, "option": visible option label, "at_word"?: word}}
+  {"upload":    {TARGET of the upload area (optional), "path": exact file path from the transcript, "at_word"?: word}}
 TARGET is one of: {"role": "link"|"button"|"textbox"|..., "name": visible label} | {"text": visible text}
                   | {"placeholder": input placeholder} | {"css": selector}
 
-Rules:
-- "say" is the narration VERBATIM from the transcript with stage directions removed. Never rephrase, add or drop words.
-  Presenter instructions must NEVER be in "say": 'Click ...', 'Then, in the chat box, enter:', the typed prompt text,
-  'Send the message.', 'Check the payment status.', 'Next, click ...'. They become actions only.
-- A segment that contains only directions (no narration) is a silent segment: omit "say".
-  Keep the transcript's segment boundaries ('---' or timestamps) unless a silent segment must be inserted.
+Narration style - a natural product demo, not a voice reading out clicks:
+- Keep the transcript's existing narration VERBATIM in "say" (stage directions removed). Never rephrase, shorten or
+  pad good narration. Presenter instructions must NEVER be spoken: 'Click ...', 'Then, in the chat box, enter:', the
+  typed prompt text, 'Send the message.', 'Check the payment status.', 'Next, click ...'. They become actions only.
+- A part of the transcript that is ONLY stage directions still gets narration: write ONE short, factual bridge sentence
+  (at most 14 words) that says the PURPOSE or the RESULT of those actions, never the mechanics, and anchor the main
+  action to a word in it with "at_word". Examples:
+    'click Agents'                          -> "Let's look at the specialist agents behind the workflow." (at_word: agents)
+    filling a form with several values      -> "I'll enter the policyholder and incident details." (fills during it)
+    'search for the claim'                  -> "I'll find the claim we just submitted." (at_word: find)
+    'send the prompt' + waiting for the AI  -> "Let's ask the assistant to raise the requisition." (at_word: ask)
+    a slow step (analysis, upload, report)  -> "The document is being analyzed." (then wait_for the result)
+  Never say "click", "type", "tap", "this button" or read typed values aloud; describe what the user achieves.
+- Pattern: natural narration -> the action lands on the word that names it (at_word) -> the next narration describes
+  the result. Keep the transcript's segment boundaries ('---' or timestamps); a direction-only part becomes a short
+  bridge segment of its own, placed before the narration that describes its result.
 - Every stage direction becomes actions in the segment where it appears. Actions run in order while that segment's
   narration plays; the next segment waits until both the narration and the actions are done.
-- If the narration describes a result that only exists after an action and an AI/async reply (typing a prompt,
-  sending it, waiting for the reply), put those actions in a SILENT segment (no "say") right before the narration.
 - Navigation tabs: {"click": {"role": "link", "name": <exact nav label from app_scan>, "zoom": false}}.
 - Use labels exactly as they appear in app_scan when the element exists there. Buttons that only appear later
   (chat reply buttons, next-step chips) are not in the scan: use the label the transcript implies, as short as the
@@ -89,6 +105,14 @@ Rules:
   Never build a selector from placeholder text: placeholders change with the app's state (a chat box can say "Start a
   conversation first" before a chat exists and "Ask me anything" after), so the selector stops matching. Type into a
   chat box with {"fill": {"role": "textbox", "nth": "last", "value": ...}}.
+- Typing: {"fill": TARGET, "value": ...} focuses the field itself - never add a click on the same field before it.
+- Native dropdowns (app_scan "selects"): {"select": {TARGET of the dropdown, "option": exact option label}} - never
+  click an option's text. Native date fields (app_scan inputs with type "date"): {"fill": {TARGET, "value":
+  "yyyy-mm-dd"}} - never click a calendar icon or day numbers.
+- Uploads: ONLY when the transcript explicitly says to upload a file AND gives its path, use {"upload": {"path": <that
+  exact path>, TARGET of the visible upload area if any}}. Never invent or guess a path; without an explicit path,
+  leave the upload out.
+- Text fields: use role "textbox" (never "input" or "textarea", which are not roles).
 - Return only the JSON object."""
 
 
@@ -103,6 +127,28 @@ def azure_config() -> dict | None:
     return cfg if all(cfg[k] for k in ("endpoint", "api_key", "deployment")) else None
 
 
+NAVIGATION_ERRORS = ("Execution context was destroyed", "because of a navigation", "Cannot find context with")
+
+
+def _scan_page(page, log=print) -> dict:
+    """Read the page with SCAN_JS. A client-side redirect or late navigation can destroy the page's JavaScript context
+    mid-read; then wait for the new document and read again (at most 2 retries, only for that error)."""
+    for attempt in range(3):
+        try:
+            return page.evaluate(SCAN_JS)
+        except Exception as e:  # noqa: BLE001 - only the navigation error is retried, anything else is raised
+            if attempt == 2 or not any(m in str(e) for m in NAVIGATION_ERRORS):
+                raise
+            log(f"  page navigated while being scanned - waiting for it to settle (retry {attempt + 1}/2)")
+            try:
+                page.wait_for_load_state("load", timeout=15000)
+                page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:  # noqa: BLE001 - a page that never goes idle is still worth reading
+                pass
+            page.wait_for_timeout(500)
+    raise AssertionError("unreachable")
+
+
 def scan_app(url: str, log=print) -> dict:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
@@ -113,7 +159,7 @@ def scan_app(url: str, log=print) -> dict:
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 720})
             page.goto(url, wait_until="networkidle", timeout=60000)
-            home = page.evaluate(SCAN_JS)
+            home = _scan_page(page, log)
             out["title"] = home["title"]
             out["pages"].append({"path": parsed.path or "/", **home})
             seen = {parsed.path or "/"}
@@ -126,7 +172,7 @@ def scan_app(url: str, log=print) -> dict:
                 try:
                     page.goto(target, wait_until="networkidle", timeout=30000)
                     page.wait_for_timeout(800)
-                    out["pages"].append({"path": tp.path, "nav_label": link["text"], **page.evaluate(SCAN_JS)})
+                    out["pages"].append({"path": tp.path, "nav_label": link["text"], **_scan_page(page, log)})
                 except Exception as e:  # a page that fails to load shouldn't stop the scan
                     log(f"  could not scan {tp.path}: {str(e).splitlines()[0]}")
         finally:
@@ -184,15 +230,67 @@ def _is_send(actions: list[dict], fill_action: dict) -> bool:
     return isinstance(click, dict) and (click.get("css") is not None or click.get("role") == "button")
 
 
-def sanitize(doc: dict) -> list[str]:
+ROLE_FIXES = {"input": "textbox", "textarea": "textbox", "text": "textbox", "textfield": "textbox",
+              "text field": "textbox", "field": "textbox"}
+TARGET_KEYS = ("testid", "role", "name", "text", "label", "placeholder", "css")
+UPLOAD_LABEL = re.compile(r"upload|browse|choose file|attach|drop (a )?file", re.I)
+# An explicit upload instruction with a path: 'Upload C:/Users/me/claim.pdf ...' / 'upload "/home/me/a.txt"'.
+UPLOAD_PATH = re.compile(r"\bupload\b[^\n]{0,40}?[\"'`\[(]?((?:[A-Za-z]:[\\/]|/|\.{1,2}[\\/]|~[\\/])"
+                         r"[^\n\"'`\])]*?\.[A-Za-z0-9]{1,6})(?=[\s\"'`\]),;]|$)", re.I)
+
+
+def _norm_path(p: str) -> str:
+    return p.strip().replace("\\", "/").lower()
+
+
+def _same_target(a: dict, b: dict) -> bool:
+    ta = {k: a[k] for k in TARGET_KEYS if a.get(k) is not None}
+    tb = {k: b[k] for k in TARGET_KEYS if b.get(k) is not None}
+    return bool(ta) and ta == tb
+
+
+def _direction_click(direction: str) -> dict | None:
+    """A silent click for a presenter instruction that was stripped from the narration and left its segment empty
+    ('Check the payment status.' -> click the button whose label best matches; the recorder matches labels loosely).
+    Typing instructions can't be recovered (the value is unknown), so they give None."""
+    if direction.rstrip().endswith(":") or re.search(r"\b(enter|type|write|fill in|send)\b", direction, re.I):
+        return None   # typing / sending: the value is unknown, nothing to perform
+    quoted = re.search(r"[\"“']([^\"”']{2,60})[\"”']", direction)
+    if quoted:
+        label = quoted.group(1)
+    else:
+        label = re.sub(r"^\W*((then|next|now|finally|first|for the final stage)\W+)*", "", direction, flags=re.I)
+        label = re.sub(r"^(click|tap|press)\s+(on\s+)?(the\s+)?((button|link|tab)\s+)?", "", label, flags=re.I)
+        label = re.sub(r"\s+(button|link|tab)\b", "", label, flags=re.I).strip(" .!:;,")
+    if not label or len(label.split()) > 8:
+        return None
+    return {"click": {"role": "button", "name": label, "nth": "last", "timeout": 120}}
+
+
+def sanitize(doc: dict, transcript: str = "") -> list[str]:
     """Deterministic clean-up of the model's common slips:
-    - stage directions left inside 'say' (they would be spoken) are removed
-    - word anchors that don't occur in their own segment's narration are dropped (the action still runs in order)"""
+    - stage directions left inside 'say' (they would be spoken) are removed; a segment left with nothing at all gets
+      a silent click for the stripped instruction, or is dropped - never left empty
+    - word anchors that don't occur in their own segment's narration are dropped (the action still runs in order)
+    - HTML tag names used as roles (role: input) become role: textbox
+    - a click that only focuses the field the next action types into is removed (fill focuses it)
+    - uploads only keep paths the transcript states explicitly; a click on an upload area becomes an upload when the
+      transcript gives exactly such a path"""
     fixes = []
     chatting = False   # set once a chat message was sent: from then on repeated buttons mean the newest reply's
+    upload_paths = []
+    for m in UPLOAD_PATH.finditer(transcript or ""):
+        path = m.group(1).strip()
+        if Path(os.path.expandvars(path)).expanduser().is_file():
+            upload_paths.append(path)
+        else:
+            fixes.append(f"upload file {path!r} from the transcript is not on this machine - that upload is left out")
+    unused_uploads = list(upload_paths)
+    kept_segments = []
     for i, seg in enumerate(doc.get("segments") or [], start=1):
         if not isinstance(seg, dict):
             continue
+        removed = []
         if isinstance(seg.get("say"), str):
             cleaned, removed = _strip_directions(seg["say"])
             for r in removed:
@@ -201,9 +299,56 @@ def sanitize(doc: dict) -> list[str]:
                 seg["say"] = cleaned
             else:
                 seg.pop("say")
+        if not seg.get("say") and not seg.get("actions"):
+            clicks = [c for c in (_direction_click(r) for r in removed) if c]
+            if clicks:
+                seg["actions"] = clicks
+                fixes.append(f"segment {i}: only an instruction was left - performing it silently: "
+                             + ", ".join(repr(c["click"]["name"]) for c in clicks))
+            else:
+                fixes.append(f"segment {i}: nothing left to say or do - segment removed")
+                continue
+        kept_segments.append(seg)
         say = seg.get("say")
         toks = tokens(spoken(say)) if isinstance(say, str) and say.strip() else []
-        actions = [a for a in seg.get("actions") or [] if isinstance(a, dict)]
+        raw_actions = [a for a in seg.get("actions") or [] if isinstance(a, dict)]
+        # A click that only focuses the field typed into next: fill focuses it itself.
+        actions = []
+        for k, action in enumerate(raw_actions):
+            nxt = raw_actions[k + 1] if k + 1 < len(raw_actions) else None
+            click, fill = action.get("click"), (nxt or {}).get("fill")
+            if isinstance(click, dict) and isinstance(fill, dict) and _same_target(click, fill):
+                if click.get("at_word") and not fill.get("at_word"):
+                    fill["at_word"] = click["at_word"]
+                fixes.append(f"segment {i}: removed the click before typing into the same field")
+                continue
+            actions.append(action)
+        seg["actions"] = actions
+        for k, action in enumerate(actions):
+            for body in [v for v in action.values() if isinstance(v, dict)]:
+                role = body.get("role")
+                if isinstance(role, str) and role.lower() in ROLE_FIXES:
+                    body["role"] = ROLE_FIXES[role.lower()]
+                    fixes.append(f"segment {i}: role {role!r} is not an accessible role - using 'textbox'")
+            up = action.get("upload")
+            if isinstance(up, dict):
+                path = str(up.get("path") or "")
+                match = next((p for p in upload_paths if _norm_path(p) == _norm_path(path)), None)
+                if match is None:
+                    fixes.append(f"segment {i}: removed upload of {path!r} (the transcript gives no such file path)")
+                    actions[k] = None
+                    continue
+                if match in unused_uploads:
+                    unused_uploads.remove(match)
+            click = action.get("click")
+            if isinstance(click, dict) and unused_uploads and UPLOAD_LABEL.search(
+                    str(click.get("name") or click.get("text") or "")):
+                label = click.get("name") or click.get("text")
+                path = unused_uploads.pop(0)
+                actions[k] = {"upload": {"text": label, "path": path,
+                                         **({"at_word": click["at_word"]} if click.get("at_word") else {})}}
+                fixes.append(f"segment {i}: {label!r} is a file upload - attaching {path!r}")
+        actions[:] = [a for a in actions if a]
         for action in actions:
             fill = action.get("fill")
             if isinstance(fill, dict):
@@ -237,6 +382,11 @@ def sanitize(doc: dict) -> list[str]:
                         fixes.append(f"segment {i}: removed {key} {word!r} (not in that segment's narration)")
                 if "until_word" in body and "at_word" not in body and "at_word" not in action:
                     fixes.append(f"segment {i}: removed until_word {body.pop('until_word')!r} (no at_word)")
+        if not seg.get("say") and not seg["actions"]:
+            kept_segments.pop()
+            fixes.append(f"segment {i}: nothing left to say or do - segment removed")
+    if "segments" in doc:
+        doc["segments"] = kept_segments
     return fixes
 
 
@@ -287,7 +437,7 @@ def draft_script(url: str, transcript: str, options: dict, out_file: Path, log=p
         content = resp.choices[0].message.content or "{}"
         try:
             doc = compose(json.loads(content), url, options)
-            for fix in sanitize(doc):
+            for fix in sanitize(doc, transcript):
                 log(f"  auto-fix: {fix}")
             out_file.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=120), encoding="utf-8")
             with tempfile.TemporaryDirectory() as td:

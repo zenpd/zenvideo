@@ -1,4 +1,5 @@
-# raw_transcript.txt as a live demo script. Narration is verbatim; stage directions became actions.
+# raw_transcript.txt as a live demo script. Existing narration is verbatim; stage directions became actions,
+# and a direction-only part got a short purpose bridge with its actions anchored to its words (at_word).
 # The app has no data-testids yet, so selectors use roles/text verified against the live app.
 # Zoom regions are CSS pixels of the 1280x720 kiosk viewport.
 title: Procure-to-Pay Agentic Assistant
@@ -44,12 +45,17 @@ segments:
       - scroll_to: { text: "PO Management Agent", exact: true, align: top, at_word: PO, until_word: Invoice }
       - scroll_to: { text: "Invoice Holds Agent", exact: true, align: top, at_word: Invoice, until_word: Holds }
 
+  # Direction-only part of the transcript: a short bridge says the purpose (never "click Chat, type ..."), and the
+  # actions land on the words that name them. The typed prompt is not read aloud; the next segment narrates the result.
   - id: raise-pr-type
+    say: >-
+      Let's ask the assistant to raise a purchase requisition for new laptops.
     actions:
-      - click: { role: link, name: Chat, zoom: false }
+      - click: { role: link, name: Chat, zoom: false, at_word: ask }
       - click: { role: button, name: Start new conversation }
-      - fill: { placeholder: "Ask me anything", value: "Create a PR for 500 laptops from Dell at $1,200 each" }
-      - click: { css: "input[placeholder*='Ask'] + button" }
+      - fill: { role: textbox, nth: last, value: "Create a PR for 500 laptops from Dell at $1,200 each",
+                at_word: requisition }
+      - press: Enter
       - wait_for: { role: button, name: Approve, nth: last, timeout: 120 }
 
   - id: raise-pr

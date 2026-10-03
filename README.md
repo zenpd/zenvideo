@@ -113,6 +113,35 @@ Background music is optional: put `.mp3` files in `music/` and they appear in th
 
 **Record again** re-records a finished video, for example after the app changed. **Retry** restarts a failed one.
 
+### How narration and actions fit together
+
+The video should feel like a person presenting the product, not a voice reading out clicks. The draft follows this
+pattern, and hand-written scripts should too:
+
+```
+natural narration  →  the word that names the step  →  the action happens  →  the narration describes the result
+```
+
+- **Your narration is kept word for word.** Stage directions (`Click "Approve"`, `Send the message.`) are never spoken;
+  they become actions.
+- **A part with only directions gets a short bridge sentence** that says the purpose, and its actions are anchored to
+  a word in it with `at_word`:
+
+  | Transcript says | Spoken | Action lands on |
+  |---|---|---|
+  | `click Agents` | "Let's look at the specialist agents behind the workflow." | "agents" |
+  | filling a form | "I'll enter the policyholder and incident details." | while it is spoken |
+  | `search for the claim` | "I'll find the claim we just submitted." | "find" |
+  | send a prompt, wait for the AI | "Let's ask the assistant to raise a purchase requisition." | "ask" |
+  | a slow step | "The document is being analyzed." | then waits for the result |
+
+- **Typed values are not read aloud.** Say what is being entered ("the incident details"), not the values.
+- **Uploads:** write the file's full path in the transcript, for example
+  `[Upload C:/Users/me/claim-evidence.pdf in Supporting Documents]`. Only an explicit path produces an upload, and the
+  file must exist on the computer running Zen Studio.
+
+See `demo/examples/p2p.yaml` (segment `raise-pr-type`) for a worked example.
+
 ### Recording modes (Settings → Recording)
 
 - **Background** (default): the app runs in a hidden browser. You can keep using the computer, and nothing plays
@@ -141,10 +170,15 @@ Useful script keys (see `demo/examples/p2p.yaml`):
 
 - `capture: background | screen`: the recording mode.
 - `pacing.narration_scroll: 0`: stop the page from scrolling on its own while the narration continues.
-- Actions: `click`, `fill`, `press`, `hover`, `wait_for`, `scroll`, `scroll_to`.
+- Actions: `click`, `fill`, `press`, `hover`, `wait_for`, `scroll`, `scroll_to`, `select`, `upload`.
   - `at_word` makes an action land on a spoken word.
   - `until_word` makes a `scroll_to` last until a later word.
   - `nth: last` targets the newest element, for repeated chat buttons.
+  - `select: { role: combobox, name: Claim type, option: "Motor / Vehicle" }` picks an option in a dropdown.
+  - `upload: { text: "Click to upload", path: C:/files/claim.pdf }` attaches a file; the target (the visible upload
+    area) is optional.
+  - Native date fields: `fill: { label: Incident date, value: "2026-09-25" }`. The date is filled directly, so no
+    calendar clicks are needed.
 
 Apps behind a login: set `storage_state: auth/<name>.json` in the script, then run
 `python -m demo auth <script>` once to sign in and save the session. The `auth/` folder is git-ignored.

@@ -8,7 +8,7 @@ import { Alert, ConfirmDialog, LogViewer, PageHead, PanelHead, Progress, Spinner
 
 const ACTION_ICON = {
   click: "click", fill: "keyboard", press: "keyboard", hover: "cursor", scroll: "scroll", scroll_to: "scroll",
-  wait_for: "hourglass", wait: "clock", goto: "open", focus: "zoom",
+  wait_for: "hourglass", wait: "clock", goto: "open", focus: "zoom", select: "list", upload: "upload",
 };
 
 function friendly(action) {
@@ -26,6 +26,11 @@ function friendly(action) {
     case "scroll_to": return target ? `Scroll to “${target}”` : "Scroll";
     case "wait_for": return target ? `Wait for “${target}”` : "Wait";
     case "goto": return "Open page";
+    case "select": return `Choose “${(label.match(/'option': '([^']+)'/) || [])[1] || "…"}”${target ? ` in ${target}` : ""}`;
+    case "upload": {
+      const file = ((label.match(/'path': '([^']+)'/) || [])[1] || "").split(/[\/]/).pop();
+      return `Upload “${file || "file"}”${target ? ` to ${target}` : ""}`;
+    }
     default: return label;
   }
 }
