@@ -306,7 +306,7 @@ def _resolve_url(url: str, base: Path) -> str:
     return p.as_uri()
 
 
-def load(path: str | Path, build_dir: str | Path | None = None) -> Demo:
+def load(path: str | Path, build_dir: str | Path | None = None, require_uploads: bool = True) -> Demo:
     path = Path(path).resolve()
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -417,7 +417,10 @@ def load(path: str | Path, build_dir: str | Path | None = None) -> Demo:
             if a.kind == "upload":
                 f = Path(os.path.expandvars(str(a.params["path"]))).expanduser()
                 f = f if f.is_absolute() else (base / f)
-                if not f.is_file():
+                # Only `record` (and `validate`, which exists to catch exactly this) actually needs
+                # the file on disk; `tts`/`render`/`check` never touch it, so a script re-run on one
+                # of those after the upload file moved or was cleaned up shouldn't hard-fail on it.
+                if require_uploads and not f.is_file():
                     raise _err(a.where, f"upload: file not found on this machine: {f}")
                 a.params["path"] = str(f.resolve())
         seg = Segment(index=i, id=str(raw.get("id", f"seg{i:03d}")), say=say, actions=actions,

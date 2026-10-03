@@ -31,7 +31,11 @@ def main() -> int:
     args = p.parse_args()
 
     try:
-        demo = load(args.script, args.build_dir)
+        # Only `validate`/`record`/`all` need the upload file(s) to actually be on disk right now —
+        # `tts`/`render`/`check` operate on an already-recorded run and never touch them, so an upload
+        # file that moved or was cleaned up after recording shouldn't block re-running those.
+        needs_uploads = args.command in ("validate", "record", "all")
+        demo = load(args.script, args.build_dir, require_uploads=needs_uploads)
     except ScriptError as e:
         print(f"Script error: {e}", file=sys.stderr)
         return 2

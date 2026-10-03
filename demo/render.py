@@ -276,6 +276,7 @@ def run_render(demo: Demo, lang: str, log=print, progress=None) -> None:
             encoder.wait(timeout=10)
         except subprocess.TimeoutExpired:
             encoder.kill()
+            encoder.wait()  # reap after kill, or returncode stays None and the error below is useless
         drain.join(timeout=5)
         err = b"".join(err_chunks).decode(errors="replace").strip()
         return media.MediaError(f"ffmpeg {context} (exit code {encoder.returncode}):\n"

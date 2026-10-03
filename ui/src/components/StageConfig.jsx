@@ -55,6 +55,16 @@ export function StageConfig({ fields, values, onChange, colors }) {
               ))}
             </select>
 
+          ) : field.type === 'text' && field.noPicker ? (
+
+            <input
+              type="text"
+              value={values[field.key] ?? field.default}
+              onChange={(e) => onChange(field.key, e.target.value)}
+              placeholder={field.default}
+              className="input font-mono text-xs"
+            />
+
           ) : field.type === 'text' ? (
 
             <FilePicker

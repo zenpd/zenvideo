@@ -88,6 +88,7 @@ export const STAGES = [
         type: 'text',
         default: '',
         help: 'Enter the website URL to automate',
+        noPicker: true, // not a file path — don't offer the project file browser for this field
       },
 
       {

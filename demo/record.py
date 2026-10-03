@@ -525,22 +525,26 @@ class Recorder:
 
     def _do_click(self, a: Action, timeout: float, where: str) -> None:
         label = a.target.name or a.target.text
-        if label and not self._base(a.target).count():
-            # An option of a native <select> is not clickable page text: choose it with select_option instead.
-            option = self.page.evaluate(FIND_SELECT_OPTION, label)
-            if option:
-                self.log(f"      {where}: {label!r} is an option of a dropdown - selecting it")
-                self._select(self.page.locator("[data-zv-select]").first, option, a, where)
-                return
-            # Native date inputs are filled directly; their calendar icon is not needed (and often not clickable).
-            if CALENDAR_ICON.search(label) and self.page.locator("input[type=date]").filter(visible=True).count():
-                self.log(f"      {where}: skipping {label!r} - the date is typed straight into the native date field")
-                return
         send_step = self.prev_kind == "fill" and self.last_input is not None
         try:
             el = self.locate(a.target, min(timeout, SEND_FALLBACK_S) if send_step else timeout, need_enabled=True,
                              where=where)
         except ActionError:
+            # The normal retrying locate() already gave the target its full timeout to render, so a
+            # genuine miss here (not just "not rendered yet") is the right moment for these heuristic
+            # reinterpretations — checking them before locate() would misfire on a target that simply
+            # hadn't appeared yet, rerouting a perfectly real pending click into the wrong element.
+            if label:
+                # An option of a native <select> is not clickable page text: choose it with select_option instead.
+                option = self.page.evaluate(FIND_SELECT_OPTION, label)
+                if option:
+                    self.log(f"      {where}: {label!r} is an option of a dropdown - selecting it")
+                    self._select(self.page.locator("[data-zv-select]").first, option, a, where)
+                    return
+                # Native date inputs are filled directly; their calendar icon is not needed (and often not clickable).
+                if CALENDAR_ICON.search(label) and self.page.locator("input[type=date]").filter(visible=True).count():
+                    self.log(f"      {where}: skipping {label!r} - the date is typed straight into the native date field")
+                    return
             if not send_step:
                 raise
             if not self.last_input.evaluate(FIND_SEND_BUTTON):

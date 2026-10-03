@@ -293,14 +293,24 @@ def webm_to_mp4(
         # ── Step 4: Merge positioned audio with video ──────────────────────
         log("\nStep 4/4 — Merging audio with video…")
 
-        # If audio is shorter than video, pad with silence; if longer, truncate video at audio end
-        shortest_flag = []
+        # If audio is shorter than video, pad it with silence to the video's length, then
+        # -shortest trims any pad overshoot back down to exactly that length. If audio is
+        # longer, video is copy-only (no re-encode) so it can't be extended to match — the
+        # best we can do without re-encoding is let the narration play in full rather than
+        # silently cutting it off; -shortest must NOT be passed in that case, or it truncates
+        # the audio to the shorter video length regardless of this branch (the bug this
+        # replaces: -shortest was previously hard-coded unconditionally below).
         if mix_dur < video_dur - 0.5:
             log(f"  Audio ({mix_dur:.1f}s) shorter than video ({video_dur:.1f}s) — padding silence to video length.")
             # apad extends audio to match video
             audio_filter = f"apad,aformat=sample_rates={sample_rate}"
+            shortest_flag = ["-shortest"]
         else:
+            if mix_dur > video_dur + 0.5:
+                log(f"  WARN: audio ({mix_dur:.1f}s) is longer than video ({video_dur:.1f}s); video has no more "
+                    f"frames after {video_dur:.1f}s but narration will keep playing to the end.")
             audio_filter = f"aformat=sample_rates={sample_rate}"
+            shortest_flag = []
 
         r = subprocess.run([
             "ffmpeg",
@@ -311,7 +321,7 @@ def webm_to_mp4(
             "-filter:a", audio_filter,
             "-map", "0:v:0",
             "-map", "1:a:0",
-            "-shortest",
+            *shortest_flag,
             "-y", output_path,
         ], capture_output=True, text=True)
 
