@@ -40,7 +40,7 @@ export function Header({ title, subtitle, search = '', onSearchChange, online })
         )}
 
         <a
-          href="http://localhost:8000/docs"
+          href="http://localhost:8010/docs"
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-secondary btn-sm hidden sm:inline-flex"

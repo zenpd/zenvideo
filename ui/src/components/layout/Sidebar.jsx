@@ -111,7 +111,7 @@ export function Sidebar({ online }) {
             <span className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wide">API unreachable</p>
-              <p className="text-[10px] text-rose-600/70">Start uvicorn on :8000</p>
+              <p className="text-[10px] text-rose-600/70">Start uvicorn on :8010</p>
             </div>
           </div>
         ) : (
@@ -121,7 +121,7 @@ export function Sidebar({ online }) {
               <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">
                 {online === null ? 'Connecting…' : 'API online'}
               </p>
-              <p className="text-[10px] text-emerald-600/70">FastAPI · :8000</p>
+              <p className="text-[10px] text-emerald-600/70">FastAPI · :8010</p>
             </div>
           </div>
         )}

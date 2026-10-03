@@ -13,7 +13,7 @@ export function Footer() {
       <span>Kokoro ONNX + FFmpeg</span>
       <span>·</span>
       <a
-        href="http://localhost:8000/docs"
+        href="http://localhost:8010/docs"
         target="_blank"
         rel="noopener noreferrer"
         className="text-zen-500 hover:text-zen-700 font-medium transition-colors"
