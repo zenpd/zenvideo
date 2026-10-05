@@ -65,8 +65,16 @@ action: exactly one of
   {"scroll_to": {TARGET, "exact"?: true, "align": "top"|"center", "at_word": word, "until_word": later word}}
   {"select":    {TARGET of the dropdown, "option": visible option label, "at_word"?: word}}
   {"upload":    {TARGET of the upload area (optional), "path": exact file path from the transcript, "at_word"?: word}}
-TARGET is one of: {"role": "link"|"button"|"textbox"|..., "name": visible label} | {"text": visible text}
-                  | {"placeholder": input placeholder} | {"css": selector}
+TARGET is exactly one of: {"role": "link"|"button"|"textbox"|..., "name": accessible name} | {"text": visible text}
+                          | {"label": form-control label} | {"placeholder": stable input placeholder} | {"css": selector}
+For ordinary search/filter fields, use the exact placeholder from app_scan. Chat placeholders can change as the
+conversation state changes, so target chat inputs with {"role": "textbox", "nth": "last"} instead.
+
+When a table repeats an action label, search/filter by the unique row identifier first. After filling the search,
+wait_for the exact identifier to appear before clicking the now-unique action label; if filtering is unavailable,
+click the unique identifier text instead.
+
+For scroll_to section headings, use a heading role/name or visible text, never a form label.
 
 Narration style - a natural product demo, not a voice reading out clicks:
 - Keep the transcript's existing narration VERBATIM in "say" (stage directions removed). Never rephrase, shorten or
@@ -102,14 +110,13 @@ Narration style - a natural product demo, not a voice reading out clicks:
   from at_word to until_word, so the page follows the voice. Plain page scrolling -> scroll with by 600-1200.
 - Unlabelled icon buttons: use {"role": "button", "name": <title/aria-label from app_scan '[title] ...'>}.
   To send what was typed into a chat box, use that button's label if the scan shows one, otherwise {"press": "Enter"}.
-  Never build a selector from placeholder text: placeholders change with the app's state (a chat box can say "Start a
-  conversation first" before a chat exists and "Ask me anything" after), so the selector stops matching. Type into a
-  chat box with {"fill": {"role": "textbox", "nth": "last", "value": ...}}.
+    For ordinary search/filter fields, use the exact placeholder from app_scan. Chat placeholders can change as the app's
+    state changes, so target chat inputs with {"fill": {"role": "textbox", "nth": "last", "value": ...}}.
 - Typing: {"fill": TARGET, "value": ...} focuses the field itself - never add a click on the same field before it.
 - Native dropdowns (app_scan "selects"): {"select": {TARGET of the dropdown, "option": exact option label}} - never
   click an option's text. Native date fields (app_scan inputs with type "date"): {"fill": {TARGET, "value":
   "yyyy-mm-dd"}} - never click a calendar icon or day numbers.
-- Uploads: ONLY when the transcript explicitly says to upload a file AND gives its path, use {"upload": {"path": <that
+- Uploads: ONLY when the transcript explicitly says to upload or attach a file AND gives its path, use {"upload": {"path": <that
   exact path>, TARGET of the visible upload area if any}}. Never invent or guess a path; without an explicit path,
   leave the upload out.
 - Text fields: use role "textbox" (never "input" or "textarea", which are not roles).
@@ -231,16 +238,18 @@ def _is_send(actions: list[dict], fill_action: dict) -> bool:
 
 
 ROLE_FIXES = {"input": "textbox", "textarea": "textbox", "text": "textbox", "textfield": "textbox",
-              "text field": "textbox", "field": "textbox"}
+              "text field": "textbox", "field": "textbox", "select": "combobox"}
 TARGET_KEYS = ("testid", "role", "name", "text", "label", "placeholder", "css")
 UPLOAD_LABEL = re.compile(r"upload|browse|choose file|attach|drop (a )?file", re.I)
-# An explicit upload instruction with a path: 'Upload C:/Users/me/claim.pdf ...' / 'upload "/home/me/a.txt"'.
-UPLOAD_PATH = re.compile(r"\bupload\b[^\n]{0,40}?[\"'`\[(]?((?:[A-Za-z]:[\\/]|/|\.{1,2}[\\/]|~[\\/])"
+# An explicit upload or attachment instruction with a path: 'Attach C:/Users/me/claim.pdf ...'.
+UPLOAD_PATH = re.compile(r"\b(?:upload|attach(?:ed)?)\b[^\n]{0,40}?[\"'`\[(]?((?:[A-Za-z]:[\\/]|/|\.{1,2}[\\/]|~[\\/])"
                          r"[^\n\"'`\])]*?\.[A-Za-z0-9]{1,6})(?=[\s\"'`\]),;]|$)", re.I)
 
 
 def _norm_path(p: str) -> str:
-    return p.strip().replace("\\", "/").lower()
+    value = p.strip().strip("\"'`“”‘’")
+    value = value.rstrip(".,;:!?)]}")
+    return os.path.normcase(os.path.normpath(os.path.expanduser(os.path.expandvars(value)))).replace("\\", "/")
 
 
 def _same_target(a: dict, b: dict) -> bool:
@@ -338,6 +347,7 @@ def sanitize(doc: dict, transcript: str = "") -> list[str]:
                     fixes.append(f"segment {i}: removed upload of {path!r} (the transcript gives no such file path)")
                     actions[k] = None
                     continue
+                up["path"] = match
                 if match in unused_uploads:
                     unused_uploads.remove(match)
             click = action.get("click")

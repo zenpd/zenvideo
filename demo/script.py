@@ -231,6 +231,8 @@ def _parse_action(raw, languages: list[str], where: str, source_mode: bool) -> A
         at_word = spec.pop("at_word")
     target_keys = {k: spec.pop(k) for k in (*TARGET_KINDS, *TARGET_EXTRAS) if k in spec}
     target_keys = {k: v for k, v in target_keys.items() if v is not None}
+    if kind == "scroll_to" and "label" in target_keys and "text" not in target_keys:
+        target_keys["text"] = target_keys.pop("label")
     timing = {k: spec.pop(k) for k in SOURCE_TIMING if k in spec} if source_mode else {}
     allowed = table[kind] | COMMON_PARAMS
     unknown = set(spec) - allowed

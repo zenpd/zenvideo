@@ -11,6 +11,7 @@ import NewVideoPage from "./pages/NewVideoPage.jsx";
 import JobPage from "./pages/JobPage.jsx";
 import LibraryPage from "./pages/LibraryPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+import ScreenRecorderPage from "./pages/ScreenRecorderPage.jsx";
 
 function initialTheme() {
   try {
@@ -137,6 +138,7 @@ function Shell() {
   if (route.page === "new") page = <NewVideoPage options={options} />;
   else if (route.page === "job") page = <JobPage id={route.id} />;
   else if (route.page === "library") page = <LibraryPage search={search} setSearch={setSearch} />;
+  else if (route.page === "screenRecorder") page = <ScreenRecorderPage />;
   else if (route.page === "settings") page = <SettingsPage options={options} settings={settings} setSettings={setSettings} />;
   else page = <DashboardPage options={options} jobs={jobs} stats={stats} target={target} />;
 
@@ -234,6 +236,9 @@ function Shell() {
           <a className="nav-item" href="#/videos" aria-current={current("library")}>
             <Icon name="library" />Library
             {stats.active > 0 && <span className="nav-count" aria-label={`${stats.active} in progress`}>{stats.active}</span>}
+          </a>
+          <a className="nav-item" href="#/screen-recorder" aria-current={current("screenRecorder")}>
+            <Icon name="video" />Screen Recorder
           </a>
           <a className="nav-item" href="#/settings" aria-current={current("settings")}><Icon name="settings" />Settings</a>
         </nav>

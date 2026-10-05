@@ -57,10 +57,15 @@ def _wait_for_exit(pid: int, timeout: float) -> bool:
 
 def list_devices(log=print) -> dict:
     """
-    Return available avfoundation video and audio devices.
+    Return available capture devices for the current platform.
     Returns: { "video": [{"idx": "0", "name": "..."}, ...],
                "audio": [{"idx": "0", "name": "..."}, ...] }
     """
+    if sys.platform != "darwin":
+        message = "Screen recording currently requires macOS and FFmpeg avfoundation."
+        log(message)
+        return {"supported": False, "platform": sys.platform, "message": message, "video": [], "audio": []}
+
     result = subprocess.run(
         ["ffmpeg", "-f", "avfoundation", "-list_devices", "true", "-i", ""],
         capture_output=True, text=True,
@@ -82,7 +87,7 @@ def list_devices(log=print) -> dict:
 
     log(f"Video devices: {[d['name'] for d in video]}")
     log(f"Audio devices: {[d['name'] for d in audio]}")
-    return {"video": video, "audio": audio}
+    return {"supported": True, "platform": sys.platform, "video": video, "audio": audio}
 
 
 # ── Start recording ───────────────────────────────────────────────────────────
@@ -106,6 +111,11 @@ def start_recording(
     video_crf     = str(video_crf) if video_crf is not None else VIDEO_CRF
     audio_bitrate = audio_bitrate or AUDIO_BITRATE
     sample_rate   = sample_rate   if sample_rate is not None else SAMPLE_RATE
+
+    if sys.platform != "darwin":
+        message = "Screen recording currently requires macOS and FFmpeg avfoundation."
+        log(message)
+        return {"error": message}
 
     if _PID_FILE.exists():
         try:

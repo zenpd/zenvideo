@@ -34,4 +34,8 @@ export const api = {
   remove: (id) => request(`${base}/jobs/${id}`, { method: "DELETE" }),
   fileUrl: (id, name) => `${base}/jobs/${id}/files/${name}`,
   eventsUrl: (id) => `${base}/jobs/${id}/events`,
+  screenRecorderDevices: () => request("/api/stage/5/devices"),
+  screenRecorderStatus: () => request("/api/stage/5/status"),
+  startScreenRecorder: (body) => request("/api/stage/5/start", { method: "POST", body: JSON.stringify(body) }),
+  stopScreenRecorder: () => request("/api/stage/5/stop", { method: "POST" }),
 };

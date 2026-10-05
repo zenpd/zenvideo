@@ -19,9 +19,6 @@ python-dotenv
 openai
 playwright
 
-# UI
-streamlit
-
 # Zen Studio server (api/main.py + api/studio.py)
 fastapi
 uvicorn

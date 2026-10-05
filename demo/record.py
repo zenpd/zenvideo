@@ -187,7 +187,7 @@ FIND_SEND_BUTTON = """(inp) => {
 
 # Drafts sometimes use HTML tag names as ARIA roles; the accessible role of a text field is "textbox".
 ROLE_ALIASES = {"input": "textbox", "textarea": "textbox", "text": "textbox", "textfield": "textbox",
-                "text field": "textbox", "field": "textbox"}
+                "text field": "textbox", "field": "textbox", "select": "combobox"}
 TEXT_FIELD_ROLES = {"textbox", "searchbox", "combobox"}
 # Visible, typeable fields, for when nothing else identifies the one meant.
 TEXT_FIELDS_CSS = ("input:not([type]), input[type=text], input[type=search], input[type=email], input[type=tel], "

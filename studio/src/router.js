@@ -15,6 +15,7 @@ export function useRoute() {
   }, []);
   const job = path.match(/^\/videos\/([\w-]+)$/);
   if (job) return { page: "job", id: job[1], path };
-  const page = { "/": "home", "/new": "new", "/videos": "library", "/settings": "settings" }[path] || "home";
+  const page = { "/": "home", "/new": "new", "/videos": "library", "/settings": "settings",
+    "/screen-recorder": "screenRecorder" }[path] || "home";
   return { page, path };
 }

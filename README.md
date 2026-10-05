@@ -189,7 +189,7 @@ Apps behind a login: set `storage_state: auth/<name>.json` in the script, then r
 
 | Path | What it is |
 |---|---|
-| `api/main.py` | FastAPI app; serves the Zen Studio UI from `studio/dist`, plus the legacy Stage 0-6 pipeline routes and the older React dashboard (see Legacy tools) |
+| `api/main.py` | FastAPI app; serves the Zen Studio UI from `studio/dist` and provides the Studio and pipeline APIs |
 | `api/studio.py` | Zen Studio API: jobs, drafting, review, production, settings |
 | `studio/` | Zen Studio web UI (React + Vite) |
 | `demo/` | The pipeline: `draft` (Azure script), `tts`, `record`, `capture`, `retime`, `render`, `effects`, `check` |
@@ -214,17 +214,10 @@ Apps behind a login: set `storage_state: auth/<name>.json` in the script, then r
 
 ---
 
-## Legacy tools
+## Legacy pipeline tools
 
-These predate Zen Studio, still work on their own, and are still wired into `api/main.py` alongside it
-(registered before the Studio catch-all mount, so both stay reachable from the same server):
+These command-line tools predate Zen Studio and remain available for existing workflows. Their API routes are still
+registered in `api/main.py` for compatibility.
 
 - `python format_transcript.py`: formats `raw_transcript.txt` into `transcript.txt`.
 - `python kokoro.py`: turns `transcript.txt` into `final_audio.mp3`.
-- `streamlit run app.py`: the older step-by-step Streamlit UI (WebM→MP4, format, TTS, sync & merge).
-- `cd ui && npm install && npm run dev` (http://localhost:5173): the earlier React + Vite dashboard for
-  Stages 0-6 (WebM→MP4, Format Transcript, Generate TTS, Sync & Merge, Browser Recording, Screen Recorder,
-  One-Shot Sync), talking to the same FastAPI backend's `/api/stage/*` routes. Live logs stream over SSE
-  while a stage runs. Screen Recorder (Stage 5) uses FFmpeg avfoundation and needs Screen Recording
-  permission on macOS — System Settings → Privacy & Security → Screen Recording — or capture can silently
-  hang instead of erroring.
