@@ -88,11 +88,11 @@ cd ..
 ### 6. Start Zen Studio
 
 ```powershell
-.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8010
+.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8010 --reload
 ```
 
 Open **http://127.0.0.1:8010**. The Settings page shows whether Azure OpenAI is connected and whether word timing
-is "Exact".
+is "Exact". The reload option also ensures code changes are picked up while Studio is running.
 
 Background music is optional: put `.mp3` files in `music/` and they appear in the New video form.
 

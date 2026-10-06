@@ -410,7 +410,8 @@ class Recorder:
         t_start = now()
         deadline = now() + timeout
         fuzzy_after = now() + min(4.0, timeout / 2)
-        field_alt = ROLE_ALIASES.get((t.role or "").lower(), t.role) in TEXT_FIELD_ROLES
+        field_alt = (self.kind == "fill"
+                     and ROLE_ALIASES.get((t.role or "").lower(), t.role) in TEXT_FIELD_ROLES)
         warned = False
         while True:
             n = loc.count()
@@ -474,13 +475,8 @@ class Recorder:
             return
         ms = self.pacing["cursor_ms"]
         t0 = now()
-        self.page.evaluate("([x, y, d]) => window.__vcursor && window.__vcursor.moveTo(x, y, d)", [x, y, ms])
-        steps = max(6, int(ms / 16))
-        for k in range(1, steps + 1):
-            p = k / steps
-            ease = 1 - (1 - p) ** 3
-            self.page.mouse.move(x0 + (x - x0) * ease, y0 + (y - y0) * ease)
-            self.wait_until(t0 + ms / 1000 * p)
+        self.page.mouse.move(x, y)
+        self.page.evaluate("([x, y, d]) => window.__vcursor?.moveTo(x, y, d)", [x, y, ms])
         self.mouse = (x, y)
         self.event("move", t0, t_end=now(), x0=x0, y0=y0, x=x, y=y)
 

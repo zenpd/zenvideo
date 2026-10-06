@@ -121,7 +121,7 @@ class BrowserCapture:
             media.FFMPEG, "-hide_banner", "-y",
             "-f", "image2pipe", "-c:v", "mjpeg", "-framerate", str(self.fps), "-i", "pipe:0",
             "-vf", f"scale={w}:{h}:flags=lanczos",
-            "-c:v", "libx264", "-preset", "ultrafast", "-qp", "0", "-pix_fmt", "yuv444p",
+            "-c:v", "libx264", "-preset", "ultrafast", "-qp", "12", "-pix_fmt", "yuv420p",
             "-g", str(self.fps), "-fps_mode", "cfr", "-r", str(self.fps),
             "-video_track_timescale", str(self.fps * 1000),
             "-movflags", "+frag_keyframe+empty_moov+default_base_moof", "-f", "mp4",

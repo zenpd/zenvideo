@@ -38,10 +38,12 @@ SCAN_JS = r"""() => {
     links: all('a[href]').map(a => ({text: txt(a).slice(0, 60), href: a.getAttribute('href')})).filter(l => l.text).slice(0, 60),
     inputs: all('input:not([type=hidden]):not([type=file]),textarea,[contenteditable=true]').map(e => ({
       tag: e.tagName.toLowerCase(), type: (e.type || '').toLowerCase(),
-      label: ((e.labels && e.labels[0] && e.labels[0].innerText) || e.getAttribute('aria-label') || e.name || '').trim().slice(0, 60),
+      label: ((e.labels && e.labels[0] && e.labels[0].innerText) || e.getAttribute('aria-label') || '').trim().slice(0, 60),
+      name: e.name || '',
       placeholder: e.getAttribute('placeholder'), disabled: !!e.disabled})).slice(0, 30),
     selects: all('select').map(e => ({
-      label: ((e.labels && e.labels[0] && e.labels[0].innerText) || e.getAttribute('aria-label') || e.name || '').trim().slice(0, 60),
+      label: ((e.labels && e.labels[0] && e.labels[0].innerText) || e.getAttribute('aria-label') || '').trim().slice(0, 60),
+      name: e.name || '',
       options: [...e.options].map(o => (o.label || o.text).trim()).filter(Boolean).slice(0, 25)})).slice(0, 15),
     file_inputs: document.querySelectorAll('input[type=file]').length,
     scroll_height: document.documentElement.scrollHeight, viewport: [innerWidth, innerHeight],
@@ -67,6 +69,12 @@ action: exactly one of
   {"upload":    {TARGET of the upload area (optional), "path": exact file path from the transcript, "at_word"?: word}}
 TARGET is exactly one of: {"role": "link"|"button"|"textbox"|..., "name": accessible name} | {"text": visible text}
                           | {"label": form-control label} | {"placeholder": stable input placeholder} | {"css": selector}
+For role targets, use "name" for the accessible name (for example {"role": "link", "name": "Dashboard"}), not "text".
+Use wait_for only for a result or control that appears after the preceding action; do not wait for a static page heading
+or label that was already visible before that action. If the click itself completes the change, omit the redundant wait.
+Use "label" only when app_scan shows a real associated label or aria-label. For unlabeled inputs or selects that have
+a "name" attribute in app_scan, target them with CSS such as {"css": "input[name=\\"amount\\"]"} or
+{"css": "select[name=\\"currency\\"]"}; do not use the name attribute as a label.
 For ordinary search/filter fields, use the exact placeholder from app_scan. Chat placeholders can change as the
 conversation state changes, so target chat inputs with {"role": "textbox", "nth": "last"} instead.
 
@@ -74,12 +82,29 @@ When a table repeats an action label, search/filter by the unique row identifier
 wait_for the exact identifier to appear before clicking the now-unique action label; if filtering is unavailable,
 click the unique identifier text instead.
 
-For scroll_to section headings, use a heading role/name or visible text, never a form label.
+For scroll_to section headings, use a heading role/name or visible text, never a form label. If the direction explicitly
+moves to a search or form field, target its exact placeholder instead.
+Only use scroll_to text that is literal visible text or quoted UI text from the transcript. Do not turn explanatory
+phrases such as "selected payment rail" into text targets; omit them and scroll to the next explicit heading instead.
+Do not combine adjacent labels, names, or status text into one target; target only a single visible text element.
+For hover targets, use an exact visible label, heading, placeholder, or accessible control from app_scan. Never use
+descriptive group names such as "event summary indicators" as visible text; target each displayed label separately.
+For native dropdown filters, target the visible combobox control (use its accessible name, or its order among
+comboboxes when the app provides no name); option labels are not visible page text. If the transcript mentions the
+selected/default option label, move to that combobox control instead of targeting the option text.
+If a mode, approach, or region choice appears in app_scan as a button, use click on that button; do not use select.
+Do not invent a button for a displayed/default region value: if the region control is not listed as a button in
+app_scan, omit that action (the app's current/default region is already selected).
 
 Narration style - a natural product demo, not a voice reading out clicks:
 - Keep the transcript's existing narration VERBATIM in "say" (stage directions removed). Never rephrase, shorten or
   pad good narration. Presenter instructions must NEVER be spoken: 'Click ...', 'Then, in the chat box, enter:', the
   typed prompt text, 'Send the message.', 'Check the payment status.', 'Next, click ...'. They become actions only.
+- When a transcript labels passages "Narration:" and "On screen:", use the Narration passage as spoken text and the
+  On screen passage only to derive actions; the labels themselves are metadata, not spoken words. Keep narration that
+  describes an action or its result; do not replace it with a short bridge or leave a narrated action segment silent.
+  Anchor each action to the matching spoken word with "at_word" where possible, distributing multiple actions across
+  their narration rather than firing them all together.
 - A part of the transcript that is ONLY stage directions still gets narration: write ONE short, factual bridge sentence
   (at most 14 words) that says the PURPOSE or the RESULT of those actions, never the mechanics, and anchor the main
   action to a word in it with "at_word". Examples:
@@ -166,6 +191,9 @@ def scan_app(url: str, log=print) -> dict:
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 720})
             page.goto(url, wait_until="networkidle", timeout=60000)
+            page.wait_for_function(
+                "() => document.body && document.body.innerText.trim().length > 0", timeout=15000
+            )
             home = _scan_page(page, log)
             out["title"] = home["title"]
             out["pages"].append({"path": parsed.path or "/", **home})
@@ -177,9 +205,23 @@ def scan_app(url: str, log=print) -> dict:
                     continue
                 seen.add(tp.path)
                 try:
-                    page.goto(target, wait_until="networkidle", timeout=30000)
+                    anchors = page.locator("a[href]").all()
+                    anchor = next(
+                        (candidate for candidate in anchors
+                         if candidate.get_attribute("href") == link["href"] and candidate.is_visible()),
+                        None,
+                    )
+                    if anchor is None:
+                        raise DraftError(f"navigation link {link['text']!r} disappeared during app scan")
+                    anchor.click(timeout=5000)
+                    page.wait_for_function(
+                        "(path) => location.pathname === path", arg=tp.path, timeout=15000
+                    )
                     page.wait_for_timeout(800)
-                    out["pages"].append({"path": tp.path, "nav_label": link["text"], **_scan_page(page, log)})
+                    scanned = _scan_page(page, log)
+                    if not any(scanned.get(key) for key in ("headings", "buttons", "links", "inputs", "selects")):
+                        raise DraftError(f"navigation page {tp.path!r} rendered no scannable content")
+                    out["pages"].append({"path": tp.path, "nav_label": link["text"], **scanned})
                 except Exception as e:  # a page that fails to load shouldn't stop the scan
                     log(f"  could not scan {tp.path}: {str(e).splitlines()[0]}")
         finally:
@@ -224,7 +266,7 @@ def _strip_directions(say: str) -> tuple[str, list[str]]:
 
 
 def _is_send(actions: list[dict], fill_action: dict) -> bool:
-    """True when this typing is a chat message: the next action presses Enter or clicks a button / css target."""
+    """True when this typing sends a chat message, not when it submits an ordinary form."""
     if "fill" not in fill_action or fill_action not in actions:
         return False
     k = actions.index(fill_action)
@@ -234,7 +276,13 @@ def _is_send(actions: list[dict], fill_action: dict) -> bool:
     if nxt.get("press") in ("Enter", {"key": "Enter"}):
         return True
     click = nxt.get("click")
-    return isinstance(click, dict) and (click.get("css") is not None or click.get("role") == "button")
+    if not isinstance(click, dict):
+        return False
+    label = " ".join(str(click.get(k) or "") for k in ("name", "text", "label"))
+    if re.search(r"\b(send|ask|post)\b", label, re.I):
+        return True
+    selector = str(click.get("css") or "")
+    return bool(re.search(r"(chat|send)[-_a-z0-9]*", selector, re.I))
 
 
 ROLE_FIXES = {"input": "textbox", "textarea": "textbox", "text": "textbox", "textfield": "textbox",
@@ -276,7 +324,7 @@ def _direction_click(direction: str) -> dict | None:
     return {"click": {"role": "button", "name": label, "nth": "last", "timeout": 120}}
 
 
-def sanitize(doc: dict, transcript: str = "") -> list[str]:
+def sanitize(doc: dict, transcript: str = "", scan: dict | None = None) -> list[str]:
     """Deterministic clean-up of the model's common slips:
     - stage directions left inside 'say' (they would be spoken) are removed; a segment left with nothing at all gets
       a silent click for the stripped instruction, or is dropped - never left empty
@@ -360,6 +408,9 @@ def sanitize(doc: dict, transcript: str = "") -> list[str]:
                 fixes.append(f"segment {i}: {label!r} is a file upload - attaching {path!r}")
         actions[:] = [a for a in actions if a]
         for action in actions:
+            click_target = action.get("click")
+            if "goto" in action or (isinstance(click_target, dict) and click_target.get("role") == "link"):
+                chatting = False
             fill = action.get("fill")
             if isinstance(fill, dict):
                 for k in [k for k, v in fill.items() if v is None]:
@@ -384,7 +435,56 @@ def sanitize(doc: dict, transcript: str = "") -> list[str]:
                 if isinstance(body, dict) and body.get("nth") == "last" and float(body.get("timeout") or 0) < 120:
                     body["timeout"] = 120   # a chat-reply element: allow the AI reply time to arrive
             bodies = [action] + [v for v in action.values() if isinstance(v, dict)]
+            target_action = next(
+                ((kind, action.get(kind)) for kind in ("scroll_to", "hover", "wait_for")
+                 if isinstance(action.get(kind), dict)),
+                None,
+            )
+            if target_action and isinstance(target_action[1].get("text"), str) and scan:
+                target_kind, target = target_action
+                wanted = re.sub(r"\W+", " ", target["text"]).strip().casefold()
+                placeholders = {
+                    inp.get("placeholder")
+                    for page in scan.get("pages", []) if isinstance(page, dict)
+                    for inp in page.get("inputs", []) if isinstance(inp, dict) and inp.get("placeholder")
+                    if re.sub(r"\W+", " ", inp["placeholder"]).strip().casefold() == wanted
+                }
+                if len(placeholders) == 1:
+                    placeholder = placeholders.pop()
+                    target.pop("text")
+                    target["placeholder"] = placeholder
+                    fixes.append(f"segment {i}: {target_kind} text matches an input placeholder - "
+                                 f"targeting {placeholder!r}")
+                    bodies = [action, target]
+                elif target_kind != "scroll_to":
+                    option_matches = []
+                    for page in scan.get("pages", []):
+                        if not isinstance(page, dict):
+                            continue
+                        for select_index, select in enumerate(page.get("selects", [])):
+                            if not isinstance(select, dict):
+                                continue
+                            for option in select.get("options", []):
+                                if (isinstance(option, str)
+                                        and re.sub(r"\W+", " ", option).strip().casefold() == wanted):
+                                    option_matches.append((page.get("path"), select_index))
+                    if len(option_matches) == 1:
+                        _, select_index = option_matches[0]
+                        target.pop("text")
+                        target.pop("exact", None)
+                        target["role"] = "combobox"
+                        target["nth"] = select_index
+                        fixes.append(f"segment {i}: {target_kind} text matches a native select option - "
+                                     f"targeting combobox {select_index}")
+                        bodies = [action, target]
             for body in bodies:
+                if isinstance(body.get("role"), str) and isinstance(body.get("text"), str):
+                    if "name" not in body:
+                        body["name"] = body.pop("text")
+                        fixes.append(f"segment {i}: role target used 'text' - using 'name' for its accessible name")
+                    else:
+                        body.pop("text")
+                        fixes.append(f"segment {i}: removed conflicting 'text' from a role target")
                 for key in ("at_word", "until_word"):
                     word = body.get(key)
                     if isinstance(word, str) and (not toks or find_phrase(toks, word) is None):
@@ -447,7 +547,7 @@ def draft_script(url: str, transcript: str, options: dict, out_file: Path, log=p
         content = resp.choices[0].message.content or "{}"
         try:
             doc = compose(json.loads(content), url, options)
-            for fix in sanitize(doc, transcript):
+            for fix in sanitize(doc, transcript, scan):
                 log(f"  auto-fix: {fix}")
             out_file.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=120), encoding="utf-8")
             with tempfile.TemporaryDirectory() as td:

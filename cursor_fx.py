@@ -45,6 +45,9 @@ CURSOR_HIGHLIGHT_MS = int(os.environ.get("CURSOR_HIGHLIGHT_MS", "350"))
 # each new document in the context.
 CURSOR_INIT_SCRIPT = r"""
 (function () {
+    let cursorX = window.innerWidth / 2;
+    let cursorY = window.innerHeight / 2;
+
     function ensure() {
         if (document.getElementById('__vcursor')) return;
 
@@ -54,6 +57,7 @@ CURSOR_INIT_SCRIPT = r"""
                 position: fixed; top: 0; left: 0; width: 28px; height: 28px;
                 pointer-events: none; z-index: 2147483647;
                 transform: translate(-9999px, -9999px);
+                will-change: transform;
                 filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
             }
             #__vhighlight {
@@ -79,6 +83,7 @@ CURSOR_INIT_SCRIPT = r"""
 
         const cursor = document.createElement('div');
         cursor.id = '__vcursor';
+        cursor.style.transform = `translate(${cursorX - 4}px, ${cursorY - 2}px)`;
         // Built with DOM calls, not innerHTML: pages that enforce Trusted Types reject innerHTML assignments.
         const SVG = 'http://www.w3.org/2000/svg';
         const svg = document.createElementNS(SVG, 'svg');
@@ -104,20 +109,20 @@ CURSOR_INIT_SCRIPT = r"""
         moveTo(x, y, durationMs) {
             ensure();
             const el = document.getElementById('__vcursor');
-            const current = el.style.transform.match(/-?\d+(\.\d+)?/g);
-            const startX = current ? parseFloat(current[0]) + 4 : x;
-            const startY = current ? parseFloat(current[1]) + 2 : y;
-            const t0 = performance.now();
+            const start = `translate(${cursorX - 4}px, ${cursorY - 2}px)`;
+            const end = `translate(${x - 4}px, ${y - 2}px)`;
+            el.style.transform = start;
 
-            function step(now) {
-                const p = Math.min(1, (now - t0) / durationMs);
-                const ease = 1 - Math.pow(1 - p, 3);
-                const cx = startX + (x - startX) * ease;
-                const cy = startY + (y - startY) * ease;
-                el.style.transform = `translate(${cx - 4}px, ${cy - 2}px)`;
-                if (p < 1) requestAnimationFrame(step);
-            }
-            requestAnimationFrame(step);
+            const animation = el.animate(
+                [{ transform: start }, { transform: end }],
+                { duration: Math.max(0, durationMs), easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' }
+            );
+            return animation.finished.then(() => {
+                animation.commitStyles();
+                animation.cancel();
+                cursorX = x;
+                cursorY = y;
+            });
         },
 
         highlight(x, y, w, h) {
@@ -160,14 +165,18 @@ def glide_to(page: Page, box: dict, duration_ms: int = CURSOR_MOVE_MS) -> Tuple[
     bounding_box() dict) and block until the glide finishes, so the motion is
     actually visible in the recording rather than happening instantly."""
     x, y = _center(box)
+    animated = False
     try:
-        page.evaluate(
-            "([x, y, d]) => window.__vcursor && window.__vcursor.moveTo(x, y, d)",
+        animated = page.evaluate(
+            "([x, y, d]) => window.__vcursor"
+            " ? window.__vcursor.moveTo(x, y, d).then(() => true)"
+            " : false",
             [x, y, duration_ms],
         )
     except Exception:
         pass  # never let the cosmetic layer break a real action
-    page.wait_for_timeout(duration_ms)
+    if not animated:
+        page.wait_for_timeout(duration_ms)
     return x, y
 
 
