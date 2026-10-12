@@ -4,22 +4,40 @@ OS-level window focus on Windows (ctypes, no dependencies).
 A browser launched from a background process (e.g. the Studio server) opens *behind* the active window, because
 Windows blocks focus stealing, and Chrome still reports document.hasFocus() == true. So the recorder finds its
 window by a temporary unique title, brings it to the foreground explicitly, and checks the real foreground window.
+
+Only `capture: screen` (full-screen) recording needs this; `capture: background` (the default) never calls these
+functions. The import itself must still succeed on non-Windows hosts (e.g. a Linux container), so the ctypes.windll
+setup below is gated on the actual OS rather than assumed — these functions simply aren't callable there.
 """
 
-import ctypes
-import ctypes.wintypes as wt
+import sys
 import time
 
-user32 = ctypes.windll.user32
-kernel32 = ctypes.windll.kernel32
-VK_MENU = 0x12
-KEYEVENTF_KEYUP = 0x2
-SW_SHOW = 5
+IS_WINDOWS = sys.platform == "win32"
 
-_EnumWindowsProc = ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
+if IS_WINDOWS:
+    import ctypes
+    import ctypes.wintypes as wt
+
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+    VK_MENU = 0x12
+    KEYEVENTF_KEYUP = 0x2
+    SW_SHOW = 5
+
+    _EnumWindowsProc = ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
+
+
+def _unsupported():
+    raise RuntimeError(
+        "full-screen (capture: screen) recording needs Windows window-focus APIs and isn't supported on this OS; "
+        "use capture: background instead, which doesn't need window focus at all."
+    )
 
 
 def find_window(title: str, timeout: float = 8.0) -> int | None:
+    if not IS_WINDOWS:
+        _unsupported()
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         found: list[int] = []
@@ -42,10 +60,14 @@ def find_window(title: str, timeout: float = 8.0) -> int | None:
 
 
 def foreground() -> int:
+    if not IS_WINDOWS:
+        _unsupported()
     return user32.GetForegroundWindow()
 
 
 def bring_to_front(hwnd: int) -> bool:
+    if not IS_WINDOWS:
+        _unsupported()
     if foreground() == hwnd:
         return True
     fg_thread = user32.GetWindowThreadProcessId(foreground(), None)

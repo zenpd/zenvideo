@@ -13,10 +13,15 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 import time
-import winsound
 from pathlib import Path
+
+if sys.platform == "win32":
+    import winsound
+else:
+    winsound = None  # audio monitoring (DEMO_MONITOR_AUDIO=1) is Windows-only; recording itself doesn't need it
 
 import numpy as np
 from playwright.sync_api import Error as PlaywrightError
@@ -49,8 +54,8 @@ TOUR_MIN_S = 4.0               # only when at least this much narration is left
 TOUR_PX_PER_S = (15, 240)      # slowest (a gentle drift on short pages) / fastest tour pace
 TOUR_MIN_PX = 150              # less room than this to scroll: stay still
 # Play each narration clip on the speakers during the take (a preview only; the video's audio comes from the WAVs).
-# Off by default so recording is silent; set DEMO_MONITOR_AUDIO=1 to hear it.
-MONITOR_AUDIO = os.environ.get("DEMO_MONITOR_AUDIO", "0") == "1"
+# Off by default so recording is silent; set DEMO_MONITOR_AUDIO=1 to hear it (Windows only - no-op elsewhere).
+MONITOR_AUDIO = winsound is not None and os.environ.get("DEMO_MONITOR_AUDIO", "0") == "1"
 
 # Eased (smoothstep) scroll of the nearest scrollable ancestor of the point, driven by requestAnimationFrame.
 SCROLLER_JS = """(x, y) => {
@@ -1023,7 +1028,8 @@ def run_record(demo: Demo, lang: str, log=print, progress=None) -> None:
                 page.wait_for_timeout(1200)
             finally:
                 stats = capture.stop()
-                winsound.PlaySound(None, 0)
+                if winsound:
+                    winsound.PlaySound(None, 0)  # stop any in-flight monitoring playback
         finally:
             context.close()
             shutil.rmtree(profile, ignore_errors=True)
