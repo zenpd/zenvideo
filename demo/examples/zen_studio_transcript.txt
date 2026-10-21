@@ -1,0 +1,41 @@
+Every product team needs demo videos for sales, onboarding and training. Making one is still slow and manual. Someone writes a script, records the screen in one clean take, records a voice-over, and then spends hours editing so the clicks line up with what is being said. When the app changes, the whole video has to be made again. So most demos are out of date, or never made at all.
+
+---
+
+This is Zen Studio. You give it the address of your web app and a narration transcript, and it produces a finished demo video. It drafts the on-screen steps, generates a natural voice-over, drives your app live in sync with the narration, and adds auto-zoom, click effects and captions. Then it checks the audio and video are in sync. Everything runs on your own machine.
+
+---
+
+Scroll down. The home dashboard shows the state of production at a glance. The key metrics show videos ready, minutes produced, videos in progress and the success rate. Below them are the most recent videos. Production health comes from real sync checks: how many passed, the worst segment offset, and any failed runs. Activity shows the videos created over the last seven days, and monthly usage tracks minutes produced against the team's target. At the bottom is what's coming next: Creative Copilot, Brand Studio and Smart Templates.
+
+---
+
+Click "New video". Creating a video starts here. First comes the address of the app to demonstrate. It can be any web app this computer can open, including one running on localhost. Zen Studio checks straight away that the app is reachable.
+
+---
+
+Scroll down. Next is the transcript. You write the narration as you would present it, plus simple stage directions such as click "Approve" or send the message. You can paste it or upload a text file. Under video settings, you choose the title, the voice, the speaking speed and optional background music. Effects add auto-zoom on interactions, captions, and a highlight on the spoken word.
+
+---
+
+When you submit, Azure OpenAI drafts the on-screen steps from the transcript. You review them as a list of steps, or edit the script directly, before anything is recorded. Then Zen Studio generates the narration, records the app, renders the video and runs the sync check. In background mode, all of this happens in a hidden browser, so you can keep working.
+
+---
+
+Click "Library". The library holds every video you've created. You can filter by ready, in progress or failed, and search by name or app.
+
+---
+
+Click "P2P Agentic Platform". Each video has its own page. Here is the finished video, with captions that highlight each word as it is spoken.
+
+---
+
+Scroll down. The sync check confirms that narration and actions line up, segment by segment. From the same recording, Zen Studio can also generate a pitch deck: slides that present the app, using real screenshots from the video. The downloads include the video, the caption file and the script. When the app changes, record again re-records the video from the same script.
+
+---
+
+Click "Settings". Settings show how this Zen Studio server is configured: the monthly usage target, the Azure OpenAI connection for drafting scripts, exact word-level timing from the voice model, and the recording mode, background or full screen.
+
+---
+
+Click "Home". Zen Studio turns any transcript into a finished, verified demo video, and a pitch deck to go with it, in minutes instead of days. When the product changes, the demo can be recorded again just as quickly.

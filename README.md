@@ -110,6 +110,9 @@ Background music is optional: put `.mp3` files in `music/` and they appear in th
    **Start recording**.
 3. Wait for narration → recording → render → sync check. The job page shows live progress and a log.
 4. Download `final.mp4` (plus `final.srt` captions) from the job page, or open it from the Library.
+5. Optional: **Generate pitch deck** on the finished video's page gives a `.pptx` that pitches the app, styled like
+   the Zen Studio product deck. Azure OpenAI writes the story (problem, solution, features, benefits) from the
+   narration, and every screenshot is a real frame from the recording. Allow about 30 seconds; regenerate any time.
 
 **Record again** re-records a finished video, for example after the app changed. **Retry** restarts a failed one.
 
@@ -162,7 +165,8 @@ python -m demo validate demo/examples/sample.yaml   # check the script
 python -m demo all      demo/examples/sample.yaml   # tts -> record -> render -> check
 ```
 
-Individual stages are `tts`, `record`, `render` and `check`. Output goes to `build/<script name>/en/`
+Individual stages are `tts`, `record`, `render` and `check`. `python -m demo deck <script>` builds the pitch deck
+(`deck.pptx` next to the video) from an existing recording. Output goes to `build/<script name>/en/`
 (`final.mp4`, `final.srt`, `check.json`, plus the working files). `demo/examples/sample.yaml` records the bundled
 `sample_app.html` and is the quickest end-to-end test.
 

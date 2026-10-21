@@ -32,5 +32,6 @@ python-multipart
 pyyaml
 numpy
 pillow
+python-pptx      # pitch deck output (deck.pptx)
 onnx
 faster-whisper   # optional fallback for word timing; exact timing comes from the Kokoro model via onnx

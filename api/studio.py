@@ -35,7 +35,8 @@ ROOT = Path(__file__).resolve().parent.parent
 JOBS_DIR = ROOT / "build" / "studio"
 MUSIC_DIR = ROOT / "music"
 STAGES = ["script", "review", "narration", "recording", "render", "check"]
-FILES = {"final.mp4": "en/final.mp4", "final.srt": "en/final.srt", "poster.jpg": "poster.jpg", "demo.yaml": "demo.yaml"}
+FILES = {"final.mp4": "en/final.mp4", "final.srt": "en/final.srt", "poster.jpg": "poster.jpg", "demo.yaml": "demo.yaml",
+         "deck.pptx": "en/deck.pptx"}
 
 router = APIRouter(prefix="/api/studio")
 _lock = threading.RLock()
@@ -93,6 +94,9 @@ def _load_jobs() -> None:
             for st in job["stages"].values():
                 if st["status"] == "running":
                     st["status"] = "failed"
+            _save(job)
+        if (job.get("deck") or {}).get("status") == "running":
+            job["deck"] = {"status": "failed", "error": "Interrupted: the server was restarted."}
             _save(job)
         _jobs[job["id"]] = job
         log_file = f.parent / "job.log"
@@ -397,6 +401,35 @@ def redraft(job_id: str):
     _update(job_id, status="drafting", error=None, check=None)
     _log(job_id, "Redrafting the script")
     threading.Thread(target=_draft_worker, args=(job_id,), daemon=True).start()
+    return get_job(job_id)
+
+
+def _deck_worker(job_id: str) -> None:
+    try:
+        demo = load(_dir(job_id) / "demo.yaml", build_dir=_dir(job_id))
+        lang = demo.languages[0]
+        transcript_file = _dir(job_id) / "transcript.txt"
+        transcript = transcript_file.read_text(encoding="utf-8") if transcript_file.exists() else ""
+        from demo.deck import run_deck
+        out = run_deck(demo, lang, demo.lang_dir(lang) / "deck.pptx", transcript, log=lambda m: _log(job_id, m))
+        from pptx import Presentation
+        _update(job_id, deck={"status": "done", "slides": len(Presentation(out).slides)})
+    except Exception as e:  # noqa: BLE001 - reported on the job page; the video itself is unaffected
+        _log(job_id, f"ERROR (deck): {e}")
+        _update(job_id, deck={"status": "failed", "error": str(e).splitlines()[0][:300]})
+
+
+@router.post("/jobs/{job_id}/deck")
+def make_deck(job_id: str):
+    """Pitch deck (deck.pptx) for a finished video: story by Azure OpenAI, screenshots from the recording."""
+    job = _get(job_id)
+    if not (_dir(job_id) / "en" / "raw.mp4").exists() or job["status"] in ("drafting", "queued", "producing"):
+        raise HTTPException(409, "Finish recording the video first - the deck uses its screenshots")
+    if (job.get("deck") or {}).get("status") == "running":
+        raise HTTPException(409, "The deck is already being generated")
+    _update(job_id, deck={"status": "running"})
+    _log(job_id, "Generating the pitch deck...")
+    threading.Thread(target=_deck_worker, args=(job_id,), daemon=True).start()
     return get_job(job_id)
 
 

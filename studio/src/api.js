@@ -31,6 +31,7 @@ export const api = {
   approve: (id) => post(`/jobs/${id}/approve`),
   retry: (id) => post(`/jobs/${id}/retry`),
   redraft: (id) => post(`/jobs/${id}/redraft`),
+  makeDeck: (id) => post(`/jobs/${id}/deck`),
   remove: (id) => request(`${base}/jobs/${id}`, { method: "DELETE" }),
   fileUrl: (id, name) => `${base}/jobs/${id}/files/${name}`,
   eventsUrl: (id) => `${base}/jobs/${id}/events`,
