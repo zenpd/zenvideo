@@ -35,8 +35,9 @@ ROOT = Path(__file__).resolve().parent.parent
 JOBS_DIR = ROOT / "build" / "studio"
 MUSIC_DIR = ROOT / "music"
 STAGES = ["script", "review", "narration", "recording", "render", "check"]
-FILES = {"final.mp4": "en/final.mp4", "final.srt": "en/final.srt", "poster.jpg": "poster.jpg", "demo.yaml": "demo.yaml",
-         "deck.pptx": "en/deck.pptx"}
+FILES = {"final.mp4": "en/final.mp4", "final.srt": "en/final.srt", "poster.jpg": "poster.jpg", "demo.yaml": "demo.yaml"}
+# Pitch decks made inside a video job before decks became the PPT skill's (ppt/); still downloadable.
+LEGACY_DECK = re.compile(r"deck(-[a-z-]+)?\.pptx")
 
 router = APIRouter(prefix="/api/studio")
 _lock = threading.RLock()
@@ -94,9 +95,6 @@ def _load_jobs() -> None:
             for st in job["stages"].values():
                 if st["status"] == "running":
                     st["status"] = "failed"
-            _save(job)
-        if (job.get("deck") or {}).get("status") == "running":
-            job["deck"] = {"status": "failed", "error": "Interrupted: the server was restarted."}
             _save(job)
         _jobs[job["id"]] = job
         log_file = f.parent / "job.log"
@@ -338,6 +336,7 @@ def get_job(job_id: str):
     job["script"] = path.read_text(encoding="utf-8") if path.exists() else None
     job["summary"] = _summary(job_id)
     job["files"] = {name: (_dir(job_id) / rel).exists() for name, rel in FILES.items()}
+    job["legacy_decks"] = sorted(f.name for f in (_dir(job_id) / "en").glob("deck*.pptx") if LEGACY_DECK.fullmatch(f.name))
     if job["status"] in ("review", "failed", "queued") or not job.get("recording_mode"):
         job["recording_mode"] = _settings()["recording_mode"]   # what the next take will use
     return job
@@ -404,33 +403,24 @@ def redraft(job_id: str):
     return get_job(job_id)
 
 
-def _deck_worker(job_id: str) -> None:
+@router.get("/jobs/{job_id}/narration")
+def job_narration(job_id: str):
+    """What the video says: the narration as spoken (the script's segments, stage directions already removed),
+    parts separated by '---'. Other skills (e.g. the PPT skill's pitch deck) build on it."""
+    job = _get(job_id)
+    narration = ""
     try:
         demo = load(_dir(job_id) / "demo.yaml", build_dir=_dir(job_id))
         lang = demo.languages[0]
-        transcript_file = _dir(job_id) / "transcript.txt"
-        transcript = transcript_file.read_text(encoding="utf-8") if transcript_file.exists() else ""
-        from demo.deck import run_deck
-        out = run_deck(demo, lang, demo.lang_dir(lang) / "deck.pptx", transcript, log=lambda m: _log(job_id, m))
-        from pptx import Presentation
-        _update(job_id, deck={"status": "done", "slides": len(Presentation(out).slides)})
-    except Exception as e:  # noqa: BLE001 - reported on the job page; the video itself is unaffected
-        _log(job_id, f"ERROR (deck): {e}")
-        _update(job_id, deck={"status": "failed", "error": str(e).splitlines()[0][:300]})
-
-
-@router.post("/jobs/{job_id}/deck")
-def make_deck(job_id: str):
-    """Pitch deck (deck.pptx) for a finished video: story by Azure OpenAI, screenshots from the recording."""
-    job = _get(job_id)
-    if not (_dir(job_id) / "en" / "raw.mp4").exists() or job["status"] in ("drafting", "queued", "producing"):
-        raise HTTPException(409, "Finish recording the video first - the deck uses its screenshots")
-    if (job.get("deck") or {}).get("status") == "running":
-        raise HTTPException(409, "The deck is already being generated")
-    _update(job_id, deck={"status": "running"})
-    _log(job_id, "Generating the pitch deck...")
-    threading.Thread(target=_deck_worker, args=(job_id,), daemon=True).start()
-    return get_job(job_id)
+        narration = "\n\n---\n\n".join(s.say[lang] for s in demo.segments if s.say.get(lang))
+    except Exception:  # noqa: BLE001 - no usable script yet: fall back to the transcript the user gave
+        pass
+    transcript = _dir(job_id) / "transcript.txt"
+    if not narration and transcript.exists():
+        narration = transcript.read_text(encoding="utf-8")
+    if not narration.strip():
+        raise HTTPException(404, "This video has no narration yet")
+    return {"id": job_id, "title": job["title"], "url": job["url"], "status": job["status"], "narration": narration}
 
 
 @router.delete("/jobs/{job_id}")
@@ -448,9 +438,9 @@ def delete_job(job_id: str):
 @router.get("/jobs/{job_id}/files/{name}")
 def job_file(job_id: str, name: str):
     _get(job_id)
-    if name not in FILES:
+    if name not in FILES and not LEGACY_DECK.fullmatch(name):
         raise HTTPException(404, "Unknown file")
-    path = _dir(job_id) / FILES[name]
+    path = _dir(job_id) / FILES.get(name, f"en/{name}")
     if not path.exists():
         raise HTTPException(404, "Not generated yet")
     return FileResponse(path, filename=None if name == "poster.jpg" else f"{job_id}-{name}")

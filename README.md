@@ -1,14 +1,20 @@
 # ZenVideo — Zen Studio
 
-Zen Studio turns a web app URL and a narration transcript into a finished demo video (MP4). It drafts the on-screen
-steps with Azure OpenAI, you review them, and it then:
+Zen Studio has two independent skills:
+
+- **Video**: a web app URL and a narration transcript become a finished demo video (MP4).
+- **PPT**: a narration, call transcript or notes become a pitch deck (PPTX) in one of six designs. It works on its own,
+  or from a finished video's narration.
+
+For a video, Zen Studio drafts the on-screen steps with Azure OpenAI, you review them, and it then:
 
 1. generates the voice-over with Kokoro TTS (offline),
 2. records the app in a hidden browser while performing the steps in sync with the narration,
 3. renders the final video with auto-zoom, click effects, word-highlighted captions and optional background music,
 4. runs an automatic audio/video sync check.
 
-Everything runs on your own machine. The only cloud call is Azure OpenAI, for drafting the script.
+Everything runs on your own machine. The only cloud calls are to Azure OpenAI: drafting the video script, and
+writing a deck's story.
 
 ---
 
@@ -110,9 +116,8 @@ Background music is optional: put `.mp3` files in `music/` and they appear in th
    **Start recording**.
 3. Wait for narration → recording → render → sync check. The job page shows live progress and a log.
 4. Download `final.mp4` (plus `final.srt` captions) from the job page, or open it from the Library.
-5. Optional: **Generate pitch deck** on the finished video's page gives a `.pptx` that pitches the app, styled like
-   the Zen Studio product deck. Azure OpenAI writes the story (problem, solution, features, benefits) from the
-   narration, and every screenshot is a real frame from the recording. Allow about 30 seconds; regenerate any time.
+5. Optional: **Create pitch deck** on the finished video's page opens the PPT skill with the video's narration filled
+   in. See [Making a pitch deck](#making-a-pitch-deck).
 
 **Record again** re-records a finished video, for example after the app changed. **Retry** restarts a failed one.
 
@@ -165,8 +170,7 @@ python -m demo validate demo/examples/sample.yaml   # check the script
 python -m demo all      demo/examples/sample.yaml   # tts -> record -> render -> check
 ```
 
-Individual stages are `tts`, `record`, `render` and `check`. `python -m demo deck <script>` builds the pitch deck
-(`deck.pptx` next to the video) from an existing recording. Output goes to `build/<script name>/en/`
+Individual stages are `tts`, `record`, `render` and `check`. Output goes to `build/<script name>/en/`
 (`final.mp4`, `final.srt`, `check.json`, plus the working files). `demo/examples/sample.yaml` records the bundled
 `sample_app.html` and is the quickest end-to-end test.
 
@@ -189,16 +193,71 @@ Apps behind a login: set `storage_state: auth/<name>.json` in the script, then r
 
 ---
 
+## Making a pitch deck
+
+Open **Pitch decks** → **New deck** (or **Create pitch deck** on a finished video). At the top give the product name and
+the app's link; below, the narration - either one is enough, both make the strongest deck. Pick a design and click
+**Generate deck**. A deck from text takes about 15 seconds; with a link, about 1-2 minutes (the app is explored once).
+
+- **Input:** a video narration, a call or meeting transcript (speaker names, timestamps, SRT/VTT subtitles and filler
+  words are cleaned out), or notes. Stage directions such as `Click "Approve"` are ignored.
+- **Deck brief:** choose who it's for (Auto, Executives, Investors, Customers, Technical team, Internal team), the length
+  (Short 5–7, Standard 8–11, Detailed 12–15 slides) and an optional focus such as "compliance and audit". The audience
+  decides what leads and what's left out. Changing the brief on a deck's page rewrites its story (one AI call).
+- **Custom:** pick **Custom** under "Who is it for?" and write your own instructions, for example "Slide 1: a pie chart
+  of … with these numbers; slide 2: a bar chart …; keep it to 6 slides". The AI follows them (slide 1 is the first slide
+  after the title slide), and the deck page lists each request as done, not done or not possible. Code checks the
+  AI's claims: a chart must actually be on the slide named, chart values must appear in your text or instructions,
+  and requests the deck can't carry out (logos, images, animations, fonts, colours) are always reported as not
+  possible.
+- **Charts:** pie, doughnut, bar, column and line charts are native PowerPoint charts (right-click → Edit Data), in
+  the design's colours. The AI also adds them on its own when the text gives three or more comparable numbers.
+- **The story:** one Azure OpenAI call plans the deck. It picks the slide types that suit the content (statement, stats,
+  problem, before/after, process, feature grid, feature focus, quote, benefits) and writes them, and longer decks get an
+  agenda. The AI only uses facts from the text. Code then removes any figure the text doesn't state, including
+  percentages the model worked out itself.
+- **Designs:** Zen Studio plus five designs based on the sample decks in `ppt/assets/samples/` (Consulting, Startup
+  Pitch Dark, Editorial Report, QBR Dashboard, Project Kickoff). Icons come from Windows' Segoe Fluent Icons font and are
+  embedded as images.
+- **Cost:** about 2–3k input and 1.5k output tokens per story (about $0.003 with gpt-4.1-mini). Switching design reuses
+  the story, so it's free. **Write a new story** asks the AI again. Each deck page shows its calls, tokens and estimated
+  cost. Set `AZURE_OPENAI_PRICE_INPUT` / `AZURE_OPENAI_PRICE_OUTPUT` (USD per 1M tokens) for your rates, and
+  `AZURE_OPENAI_PPT_DEPLOYMENT` to use a different deployment for decks.
+- **From the app's link:** give the link (with or without a narration). A hidden browser goes through the app once,
+  like a person: page by page through its navigation (clicked inside the app, so single-page apps without deep links
+  work), and on each page its tabs and option buttons, accordions and the first item of a list (its detail view). It
+  waits for static and dynamic pages to settle - network, "Loading…", spinners and skeletons, changing text, lazy
+  content - with extra patience for an app whose server is waking up. Each distinct screen is kept with its text and
+  how it was reached; the AI writes the story from that tour, the best screens (results first) become screenshot
+  slides, and each screenshot slide's notes say where to show it in the app. Numbers on the app's screens are treated
+  as demo data: they stay in the screenshots, never in the slide text. With a narration too, the narration leads.
+- **Try the app's forms (off by default, demo/test apps only):** also clicks the main button of forms that are already
+  filled in, once, to capture the result (e.g. a payment's AI routing). Nothing is typed. Buttons that could change or
+  share data or end the session (delete, save, pay, send, regenerate, log out, …) are never clicked in either mode.
+  Apps behind a sign-in: only what is visible without signing in is explored.
+
+From the command line:
+
+```powershell
+python -m ppt narration.txt --template consulting          # -> narration.pptx
+python -m ppt call.vtt --template pitch-dark --title "ShiftBoard"
+python -m ppt --url https://your-app.example.com --try-forms --out app.pptx    # from the app alone"
+```
+
+---
+
 ## Project layout
 
 | Path | What it is |
 |---|---|
 | `api/main.py` | FastAPI app; serves the Zen Studio UI from `studio/dist` |
-| `api/studio.py` | Zen Studio API: jobs, drafting, review, production, settings |
+| `api/studio.py` | Video skill API (`/api/studio`): jobs, drafting, review, production, settings, a video's narration |
 | `studio/` | Zen Studio web UI (React + Vite) |
-| `demo/` | The pipeline: `draft` (Azure script), `tts`, `record`, `capture`, `retime`, `render`, `effects`, `check` |
+| `demo/` | Video skill pipeline: `draft` (Azure script), `tts`, `record`, `capture`, `retime`, `render`, `effects`, `check` |
+| `ppt/` | PPT skill: `source` (text cleaning), `writer` (story), `designs/`, `capture` (explores an app's link), `service`, `api` (`/api/ppt`) |
 | `demo/examples/` | Example scripts, transcripts and a sample app |
-| `build/studio/<job id>/` | Each Zen Studio job: `job.json`, `job.log`, `demo.yaml`, `en/final.mp4` … (git-ignored) |
+| `build/studio/<job id>/` | Each video job: `job.json`, `job.log`, `demo.yaml`, `en/final.mp4` … (git-ignored) |
+| `build/decks/<deck id>/` | Each pitch deck: `job.json`, `narration.txt`, `pages/` + `pages.json` (the explored app), `deck.json` (the story), `deck*.pptx` (git-ignored) |
 | `music/` | Background music tracks (`.mp3`) |
 | `models/` | Generated timed voice model, optional Whisper model (git-ignored) |
 

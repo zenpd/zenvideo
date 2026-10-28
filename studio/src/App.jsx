@@ -9,6 +9,7 @@ import CommandPalette from "./CommandPalette.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import NewVideoPage from "./pages/NewVideoPage.jsx";
 import JobPage from "./pages/JobPage.jsx";
+import DecksPage, { LinkDeckPage, NewDeckPage } from "./pages/DecksPage.jsx";
 import LibraryPage from "./pages/LibraryPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 
@@ -37,6 +38,12 @@ function useOutside(ref, open, close) {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [ref, open, close]);
+}
+
+/** Old address of a video's deck page: decks are the PPT skill's now. */
+function DeckRedirect({ id }) {
+  useEffect(() => { navigate(`/decks/new?video=${id}`); }, [id]);
+  return null;
 }
 
 function Shell() {
@@ -131,11 +138,16 @@ function Shell() {
     }
   };
 
-  const current = (page) => (route.page === page || (page === "library" && route.page === "job") ? "page" : undefined);
+  const current = (page) => (route.page === page || (page === "library" && ["job", "deck"].includes(route.page))
+    || (page === "decks" && ["newdeck", "linkdeck"].includes(route.page)) ? "page" : undefined);
 
   let page;
   if (route.page === "new") page = <NewVideoPage options={options} />;
   else if (route.page === "job") page = <JobPage id={route.id} />;
+  else if (route.page === "deck") page = <DeckRedirect id={route.id} />;
+  else if (route.page === "decks") page = <DecksPage />;
+  else if (route.page === "newdeck") page = <NewDeckPage />;
+  else if (route.page === "linkdeck") page = <LinkDeckPage id={route.id} />;
   else if (route.page === "library") page = <LibraryPage search={search} setSearch={setSearch} />;
   else if (route.page === "settings") page = <SettingsPage options={options} settings={settings} setSettings={setSettings} />;
   else page = <DashboardPage options={options} jobs={jobs} stats={stats} target={target} />;
@@ -235,6 +247,7 @@ function Shell() {
             <Icon name="library" />Library
             {stats.active > 0 && <span className="nav-count" aria-label={`${stats.active} in progress`}>{stats.active}</span>}
           </a>
+          <a className="nav-item" href="#/decks" aria-current={current("decks")}><Icon name="presentation" />Pitch decks</a>
           <a className="nav-item" href="#/settings" aria-current={current("settings")}><Icon name="settings" />Settings</a>
         </nav>
         <div className="nav-label" id="recent-label">Recent videos</div>
@@ -242,7 +255,7 @@ function Shell() {
           {recent.length === 0 && <p className="meta" style={{ padding: "0 12px" }}>Videos you create appear here.</p>}
           {recent.map((j) => (
             <a key={j.id} className="nav-item nav-recent" href={`#/videos/${j.id}`}
-              aria-current={route.page === "job" && route.id === j.id ? "page" : undefined}>
+              aria-current={["job", "deck"].includes(route.page) && route.id === j.id ? "page" : undefined}>
               <span className="status-dot" style={{ background: STATUS_DOT[j.status] }} aria-hidden="true" />
               <span className="name">{j.title}</span>
               <span className="sr-only">, {STATUS[j.status]?.label}</span>

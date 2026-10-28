@@ -18,6 +18,8 @@ async function request(path, options = {}) {
 
 const base = "/api/studio";
 const post = (path, body) => request(base + path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
+const ppt = "/api/ppt";   // the PPT skill
+const pptPost = (path, body) => request(ppt + path, { method: "POST", body: JSON.stringify(body || {}) });
 
 export const api = {
   options: () => request(`${base}/options`),
@@ -31,8 +33,22 @@ export const api = {
   approve: (id) => post(`/jobs/${id}/approve`),
   retry: (id) => post(`/jobs/${id}/retry`),
   redraft: (id) => post(`/jobs/${id}/redraft`),
-  makeDeck: (id) => post(`/jobs/${id}/deck`),
+  narration: (id) => request(`${base}/jobs/${id}/narration`),
   remove: (id) => request(`${base}/jobs/${id}`, { method: "DELETE" }),
+  // the PPT skill (/api/ppt): decks from a narration, transcript or notes
+  deckTemplates: () => request(`${ppt}/templates`),
+  briefOptions: () => request(`${ppt}/brief-options`),
+  deckSampleUrl: (template) => `${ppt}/templates/${template}/sample`,
+  decks: (video) => request(`${ppt}/decks${video ? `?video=${encodeURIComponent(video)}` : ""}`),
+  deck: (id) => request(`${ppt}/decks/${id}`),
+  createDeck: (body) => pptPost("/decks", body),
+  buildDeck: (id, body) => pptPost(`/decks/${id}/build`, body),
+  removeDeck: (id) => request(`${ppt}/decks/${id}`, { method: "DELETE" }),
+  deckDownloadUrl: (id, name) => `${ppt}/decks/${id}/files/${name}`,
+  deckShotUrl: (id, file) => `${ppt}/decks/${id}/pages/${file}`,
   fileUrl: (id, name) => `${base}/jobs/${id}/files/${name}`,
   eventsUrl: (id) => `${base}/jobs/${id}/events`,
 };
+
+/** The file a deck design is saved as (the original Zen Studio design keeps the old name). */
+export const deckFile = (template) => (template === "zen" ? "deck.pptx" : `deck-${template}.pptx`);

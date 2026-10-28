@@ -197,40 +197,35 @@ function CheckResults({ check }) {
   );
 }
 
+/** Pitch decks made from this video by the PPT skill (they use the video's narration, no screenshots). */
 function DeckPanel({ job }) {
-  const toast = useToast();
-  const [starting, setStarting] = useState(false);
-  const deck = job.deck || {};
-  const running = deck.status === "running" || starting;
-  const ready = job.files?.["deck.pptx"];
-  const make = async () => {
-    setStarting(true);
-    try {
-      await api.makeDeck(job.id);
-      toast("Generating the pitch deck…", "info");
-    } catch (e) {
-      toast(e.message, "error");
-    } finally {
-      setStarting(false);
-    }
-  };
+  const [decks, setDecks] = useState(null);
+  useEffect(() => {
+    api.decks(job.id).then(setDecks).catch(() => setDecks([]));
+  }, [job.id]);
+  const legacy = job.legacy_decks || [];
   return (
     <section className="panel rise" aria-labelledby="deck-title">
       <PanelHead icon="presentation" tone="violet" title={<span id="deck-title">Pitch deck</span>}
-        subtitle="Slides that pitch this app, with screenshots from the recording" />
+        subtitle="Slides that pitch this app, written from the video's narration" />
       <div className="stack" style={{ gap: 8 }}>
-        {running && <p className="muted" role="status" style={{ margin: 0, display: "flex", alignItems: "center", gap: 10 }}><span className="spinner" aria-hidden="true" /> Writing the story and building the slides…</p>}
-        {!running && deck.status === "failed" && <Alert intent="error" title="The deck could not be generated">{deck.error}</Alert>}
-        {!running && ready && (
-          <a className="btn btn-primary" href={api.fileUrl(job.id, "deck.pptx")} download>
-            <Icon name="download" size={18} />Pitch deck (PPTX){deck.slides ? ` · ${deck.slides} slides` : ""}
+        {(decks || []).map((d) => (
+          <a key={d.id} className="btn" href={`#/decks/${d.id}`} style={{ justifyContent: "space-between" }}>
+            <span className="row" style={{ gap: 8, minWidth: 0 }}>
+              <Icon name="presentation" size={18} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{d.title}</span>
+            </span>
+            <span className="meta">{d.status === "running" ? "Generating…" : `${Object.keys(d.decks || {}).length} design${Object.keys(d.decks || {}).length === 1 ? "" : "s"}`}</span>
           </a>
-        )}
-        {!running && (
-          <button type="button" className={`btn${ready ? "" : " btn-primary"}`} onClick={make}>
-            <Icon name={ready ? "refresh" : "sparkles"} size={18} />{ready ? "Regenerate deck" : "Generate pitch deck"}
-          </button>
-        )}
+        ))}
+        {legacy.map((name) => (
+          <a key={name} className="btn btn-ghost" href={api.fileUrl(job.id, name)} download>
+            <Icon name="download" size={18} />Earlier deck ({name})
+          </a>
+        ))}
+        <button type="button" className="btn btn-primary" onClick={() => navigate(`/decks/new?video=${job.id}`)}>
+          <Icon name="sparkles" size={18} />{decks?.length ? "Create another pitch deck" : "Create pitch deck"}
+        </button>
       </div>
     </section>
   );

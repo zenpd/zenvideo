@@ -321,9 +321,11 @@ def run_stage4(body: Stage4Config):
 # ── ZenVideo Studio (API + built web app) ────────────────────────────────────
 
 from api.studio import router as studio_router  # noqa: E402
+from ppt.api import router as ppt_router  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 app.include_router(studio_router)
+app.include_router(ppt_router)
 _studio_dist = ROOT / "studio" / "dist"
 if _studio_dist.exists():
     app.mount("/", StaticFiles(directory=_studio_dist, html=True), name="studio")

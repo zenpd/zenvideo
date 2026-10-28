@@ -24,7 +24,7 @@ def main() -> int:
 
     p = argparse.ArgumentParser(prog="python -m demo", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("command", choices=["validate", "tts", "record", "render", "check", "all", "auth", "deck"])
+    p.add_argument("command", choices=["validate", "tts", "record", "render", "check", "all", "auth"])
     p.add_argument("script", help="path to demo.yaml")
     p.add_argument("--lang", help="language to build (default: every language in the script)")
     p.add_argument("--build-dir", help="default: build/<script name>")
@@ -49,12 +49,6 @@ def main() -> int:
     if args.command == "auth":
         from demo.record import run_auth
         run_auth(demo)
-        return 0
-
-    if args.command == "deck":
-        from demo.deck import run_deck
-        for lang in langs:
-            run_deck(demo, lang, demo.lang_dir(lang) / "deck.pptx")
         return 0
 
     stages = ["tts", "record", "render", "check"] if args.command == "all" else [args.command]

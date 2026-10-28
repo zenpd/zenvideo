@@ -50,7 +50,7 @@ export function useJob(id) {
     source.addEventListener("job", (e) => {
       const live = JSON.parse(e.data);
       if (!live) return;
-      const phase = `${live.status}:${live.stage}:${JSON.stringify(live.stages)}`;
+      const phase = `${live.status}:${live.stage}:${JSON.stringify(live.stages)}:${JSON.stringify(live.deck)}`;
       if (phase !== lastPhase.current) {
         lastPhase.current = phase;
         refresh();
