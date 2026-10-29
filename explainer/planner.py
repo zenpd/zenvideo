@@ -117,7 +117,9 @@ def plan_scenes(narration: str, title: str = "", mode: str = "as_written", targe
     if len(" ".join(said).split()) < 20:
         raise StoryError("the narration is too short - give at least a few sentences to explain")
     mode = mode if mode in MODES else "as_written"
-    words = len(" ".join(said).split()) if mode == "as_written" else max(60, round(target_seconds / 60 * WPM))
+    # tighten: the words that fit once the pauses between scenes, the opening and the ending are taken out
+    words = (len(" ".join(said).split()) if mode == "as_written" else
+             max(60, round((target_seconds - 4 - 0.55 * target_seconds / 8) * 2.1)))
     n_scenes = max(3, min(18, round(words / 30)))
     say = SAY_AS_WRITTEN if mode == "as_written" else SAY_TIGHTEN.replace("[WORDS]", str(words))
     prompt = (PROMPT.replace("[SAY]", say).replace("[ICONS]", ", ".join(ICONS)).replace("[MAXWORDS]", "45")
@@ -126,7 +128,10 @@ def plan_scenes(narration: str, title: str = "", mode: str = "as_written", targe
     raw, usage = chat_json(prompt, payload, "Planning the scenes", log, temperature=0.4)
     log(f"Scenes planned: {usage['input_tokens']:,} input + {usage['output_tokens']:,} output tokens "
         f"(about ${usage['cost_usd']:.4f})")
-    return check(raw, said, title, mode), usage
+    plan = check(raw, said, title, mode)
+    if mode == "tighten":
+        fit_scenes(plan, target_seconds, log)
+    return plan, usage
 
 
 def _voice_over(raw_scenes: list, said: list[str], mode: str, numbers: set, vocab: set) -> list[tuple[dict, str]]:
@@ -290,3 +295,48 @@ def _headline(say: str) -> str:
     """A short on-screen line for a scene whose layout was dropped: its first sentence, cut to 10 words."""
     first = re.split(r"(?<=[.!?])\s+", say.strip())[0].rstrip(".!?")
     return " ".join(first.split()[:10]) + ("..." if len(first.split()) > 10 else "")
+
+
+# ── keeping a tightened voice-over to its length, before anything is voiced ─────────────────────────────────
+
+WORDS_PER_SECOND = 2.1     # Kokoro at speed 1.0, measured
+PAUSES = 0.9 + 2.6         # before the first word and after the last (explainer.voice LEAD_IN and OUTRO)
+BETWEEN = 0.55             # between two scenes (explainer.voice GAP)
+
+
+def estimate_seconds(plan: dict) -> float:
+    words = sum(len(sc["say"].split()) for sc in plan["scenes"])
+    return PAUSES + BETWEEN * max(0, len(plan["scenes"]) - 1) + words / WORDS_PER_SECOND
+
+
+def fit_scenes(plan: dict, target_seconds: int, log=print) -> None:
+    """A voice-over the model wrote longer than asked is cut here, in code, so the video keeps its length: each scene
+    keeps its first whole sentences within its share of the words (at least one), then whole scenes from the middle
+    are dropped - statements first - until it fits. The title and the closing always stay; cues not said any more are
+    cleared (those items are spread over the scene instead)."""
+    if estimate_seconds(plan) <= target_seconds * 1.05:
+        return
+    before = sum(len(sc["say"].split()) for sc in plan["scenes"])
+    scenes = plan["scenes"]
+    speech = target_seconds - PAUSES - BETWEEN * (len(scenes) - 1)
+    cap = max(12, round(speech * WORDS_PER_SECOND / max(1, len(scenes)) * 1.25))
+    for sc in scenes:
+        kept: list[str] = []
+        for sent in re.split(r"(?<=[.!?])\s+", sc["say"].strip()):
+            if kept and len(" ".join(kept + [sent]).split()) > cap:
+                break
+            kept.append(sent)
+        sc["say"] = " ".join(kept)
+    while estimate_seconds(plan) > target_seconds * 1.05 and len(scenes) > 3:
+        middle = [k for k in range(1, len(scenes) - 1) if scenes[k]["type"] not in ("title", "closing")]
+        if not middle:
+            break
+        plain = [k for k in middle if scenes[k]["type"] == "statement"]
+        del scenes[(plain or middle)[len(plain or middle) // 2]]
+    for sc in scenes:
+        for key in ("items", "stats", "steps", "rows", "bars"):
+            for it in sc.get(key) or []:
+                if it.get("cue"):
+                    it["cue"] = _cue(it["cue"], sc["say"])
+    log(f"Voice-over cut from {before} to {sum(len(sc['say'].split()) for sc in scenes)} words, {len(scenes)} scenes, "
+        f"about {estimate_seconds(plan):.0f}s, to fit {target_seconds}s")

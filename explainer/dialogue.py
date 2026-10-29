@@ -53,7 +53,17 @@ STUDIO_CAST = {
               "tie": "#7c2d12", "trousers": "#1c2f45", "shoes": "#1b1b1b", "pocket": "#f4f6f9", "stubble": True},
 }
 DEFAULT_STUDIO = ("sophie", "james")
-FORMATS = ("conversation", "presenters")
+FORMATS = ("conversation", "presenters", "conversation3d")
+
+
+def presets_for(fmt: str) -> tuple[dict, tuple[str, str]]:
+    """The people a format can cast, and its default pair."""
+    if fmt == "presenters":
+        return STUDIO_CAST, DEFAULT_STUDIO
+    if fmt == "conversation3d":          # realistic 3D office people (Microsoft Rocketbox), explainer.office3d
+        from explainer.office3d import AVATARS, DEFAULT_3D
+        return AVATARS, DEFAULT_3D
+    return CAST, DEFAULT_CAST
 GESTURES = ("explain", "point", "open", "count", "think", "wave", "none")
 MOODS = ("neutral", "happy", "curious", "concerned", "excited")
 
@@ -128,8 +138,7 @@ def plan_dialogue(narration: str, title: str = "", cast: tuple[str, str] = DEFAU
     said = sentences(narration)
     if len(" ".join(said).split()) < 20:
         raise StoryError("the narration is too short - give at least a few sentences to talk about")
-    presets = STUDIO_CAST if fmt == "presenters" else CAST
-    default = DEFAULT_STUDIO if fmt == "presenters" else DEFAULT_CAST
+    presets, default = presets_for(fmt)
     people = [presets.get(c) or presets[default[i]] for i, c in enumerate(cast)]
     words, n_lines = budget(target_seconds, fmt)
     prompt = (PRESENTERS if fmt == "presenters" else PROMPT).replace("[WORDS]", str(words)).replace(
@@ -263,8 +272,7 @@ def check(raw: dict, said: list[str], title: str, cast: tuple[str, str], fmt: st
     with cues from their line, gestures and moods from the fixed sets, both speakers present."""
     narration = " ".join(said)
     numbers = _numbers_in(narration)
-    presets = STUDIO_CAST if fmt == "presenters" else CAST
-    default = DEFAULT_STUDIO if fmt == "presenters" else DEFAULT_CAST
+    presets, default = presets_for(fmt)
     people = [presets.get(c) or presets[default[i]] for i, c in enumerate(cast)]
     app_name = title or _text(raw.get("app_name"), 4)
     vocab = _vocab(narration, title, app_name, people[0]["name"], people[1]["name"])

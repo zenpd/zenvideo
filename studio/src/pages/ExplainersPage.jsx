@@ -29,7 +29,7 @@ const SWATCH = {
 const LAYOUT_LABEL = { title: "Title", statement: "Statement", points: "Key points", stats: "Numbers", steps: "Steps",
   compare: "Before / after", chart: "Chart", icons: "Icon grid", quote: "Quote", closing: "Closing" };
 
-const STYLE_LABEL = { explainer: "Explainer", conversation: "Conversation", presenters: "Presenters" };
+const STYLE_LABEL = { explainer: "Explainer", conversation: "Conversation", presenters: "Presenters", hitech: "Hi-tech", conversation3d: "3D conversation" };
 
 const words = (t) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 
@@ -153,7 +153,7 @@ function StylePicker({ styles, value, onChange, disabled }) {
       {styles.map((s) => (
         <button key={s.id} type="button" role="radio" aria-checked={value === s.id} disabled={disabled} className="ex-style"
           onClick={() => onChange(s.id)}>
-          <Icon name={s.id === "conversation" ? "user" : "sparkles"} size={22} />
+          <Icon name={{ conversation: "user", presenters: "presentation", hitech: "wand", conversation3d: "user" }[s.id] || "sparkles"} size={22} />
           <span><strong>{s.label}</strong><span className="meta">{s.hint}</span></span>
         </button>
       ))}
@@ -163,7 +163,7 @@ function StylePicker({ styles, value, onChange, disabled }) {
 
 function CastPicker({ options, look, set, disabled }) {
   const studio = look.style === "presenters";
-  const people = studio ? options.studio_cast : options.cast;
+  const people = studio ? options.studio_cast : look.style === "conversation3d" ? options.cast3d : options.cast;
   const byId = Object.fromEntries(people.map((p) => [p.id, p]));
   const pick = (i, id) => {
     const cast = [...look.cast];
@@ -222,9 +222,10 @@ function LogoField({ logo, current, onChange, disabled }) {
 
 function LookFields({ options, look, set, disabled, showScript = true, logo, setLogo, currentLogo }) {
   const presenters = look.style === "presenters";
-  const talk = look.style === "conversation" || presenters;
+  const talk = look.style === "conversation" || look.style === "conversation3d" || presenters;
   const setStyle = (style) => set({ style, voices: ["", ""],
-    cast: style === "presenters" ? options.default_studio : style === "conversation" ? options.default_cast : look.cast,
+    cast: style === "presenters" ? options.default_studio : style === "conversation" ? options.default_cast
+      : style === "conversation3d" ? options.default_3d : look.cast,
     seconds: style === "presenters" && look.seconds > 90 ? 85 : look.seconds });
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -236,7 +237,7 @@ function LookFields({ options, look, set, disabled, showScript = true, logo, set
           : "They talk at a desk in an office; a wall screen between them shows the key points."}>
         <CastPicker options={options} look={look} set={set} disabled={disabled} />
       </Field>}
-      {talk && <div className="deck-form">
+      {(talk || look.style === "hitech") && <div className="deck-form">
         <Field label="Company logo (optional)" hint="On the wall behind them, the screen and the end card. Its colours become the set's colours.">
           <LogoField logo={logo} current={currentLogo} onChange={setLogo} disabled={disabled} />
         </Field>
@@ -438,7 +439,7 @@ export function ExplainerPage({ id }) {
   const file = (name) => api.explainerFileUrl(video.id, name);
   const stage = video.stage ? video.stage : video.progress > 0 ? `Animating · ${Math.round(video.progress * 100)}%`
     : video.style === "conversation" ? "Writing the conversation and voicing it" : "Planning scenes and voicing them";
-  const isTalk = video.style === "conversation" || video.style === "presenters";
+  const isTalk = ["conversation", "presenters", "conversation3d"].includes(video.style);
 
   return (
     <>
@@ -471,7 +472,7 @@ export function ExplainerPage({ id }) {
           ) : <p className="muted">No video yet.</p>}
           {video.files?.["final.mp4"] && !running && (
             <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-              <a className="btn btn-sm" href={file("player.html")} target="_blank" rel="noreferrer"><Icon name="open" size={16} />Open the animation in a browser</a>
+              {video.files?.["player.html"] && <a className="btn btn-sm" href={file("player.html")} target="_blank" rel="noreferrer"><Icon name="open" size={16} />Open the animation in a browser</a>}
               <a className="btn btn-sm btn-ghost" href={file("final.srt") + "?download=1"}><Icon name="captions" size={16} />Captions (.srt)</a>
             </div>
           )}

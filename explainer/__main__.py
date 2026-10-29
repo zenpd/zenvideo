@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from explainer.dialogue import CAST, STUDIO_CAST
+from explainer.office3d import AVATARS
 from explainer.render import THEMES
 from explainer.service import STYLES, generate, stage_of
 from ppt.writer import StoryError
@@ -23,7 +24,7 @@ def main() -> int:
                          "presenters in a branded studio)")
     ap.add_argument("--theme", default="midnight", choices=list(THEMES))
     ap.add_argument("--voice", default="af_sky", help="explainer: the narrator's voice")
-    ap.add_argument("--cast", nargs=2, choices=list(CAST) + list(STUDIO_CAST),
+    ap.add_argument("--cast", nargs=2, choices=list(CAST) + list(STUDIO_CAST) + list(AVATARS),
                     help="conversation: who asks and who explains; presenters: the two presenters")
     ap.add_argument("--logo", help="presenters: the company's logo (PNG or JPG), on the studio wall")
     ap.add_argument("--brand", default="", help="presenters: the company's name (shown when there is no logo)")

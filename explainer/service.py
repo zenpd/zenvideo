@@ -23,12 +23,13 @@ from PIL import Image
 from explainer import render
 import re
 
-from explainer.dialogue import CAST, DEFAULT_CAST, DEFAULT_STUDIO, STUDIO_CAST, fit_length, plan_dialogue
-from explainer.planner import MODES, plan_scenes
+from explainer.dialogue import fit_length, plan_dialogue, presets_for
+from explainer.planner import MODES, estimate_seconds, fit_scenes, plan_scenes
 from explainer.voice import narrate, narrate_dialogue
 
 PLAN_VERSION = 2
-STYLES = ("explainer", "conversation", "presenters")
+STYLES = ("explainer", "conversation", "presenters", "hitech", "conversation3d")   # hitech, 3D: by HyperFrames
+TALK = ("conversation", "presenters", "conversation3d")
 MAX_SPEED = 1.12        # a script that comes out longer than asked is spoken a little faster, up to this
 
 
@@ -80,7 +81,7 @@ def brand_colors(logo: Path) -> dict:
 
 def _plan_key(style: str, title: str, mode: str, seconds: int, cast: tuple[str, str]) -> dict:
     """What a saved plan was made for; a plan made for anything else is planned again."""
-    if style in ("conversation", "presenters"):
+    if style in TALK:
         return {"version": PLAN_VERSION, "style": style, "title": title, "seconds": seconds, "cast": list(cast)}
     return {"version": PLAN_VERSION, "style": style, "title": title, "mode": mode,
             **({"seconds": seconds} if mode == "tighten" else {})}
@@ -112,7 +113,7 @@ def generate(work_dir: Path, narration: str, title: str = "", theme: str = "midn
     work_dir.mkdir(parents=True, exist_ok=True)
     style = style if style in STYLES else "explainer"
     mode = mode if mode in MODES else "as_written"
-    presets, default = (STUDIO_CAST, DEFAULT_STUDIO) if style == "presenters" else (CAST, DEFAULT_CAST)
+    presets, default = presets_for(style if style in TALK else "conversation")
     cast = tuple(c if c in presets else default[i] for i, c in enumerate(cast or default))
     if logo:
         shutil.copyfile(logo, work_dir / "logo.png") if Path(logo).resolve() != (work_dir / "logo.png") else None
@@ -127,20 +128,25 @@ def generate(work_dir: Path, narration: str, title: str = "", theme: str = "midn
     plan = None if replan else _saved_plan(work_dir, key)
     if plan:
         log("Reusing the plan (plan.json) - no tokens spent")
-        if style in ("conversation", "presenters"):      # a plan saved before the length was checked
+        if style in TALK:                                 # a plan saved before the length was checked
             fitted, more = fit_length(plan, narration, title, cast, target_seconds, log, fmt=style)
             if more:
                 plan, usage = {**fitted, "made_for": key}, more
                 (work_dir / "plan.json").write_text(json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")
+        elif mode == "tighten":                           # a scene plan saved before the length was checked
+            before = estimate_seconds(plan)
+            fit_scenes(plan, target_seconds, log)
+            if estimate_seconds(plan) < before:
+                (work_dir / "plan.json").write_text(json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")
     else:
-        if style in ("conversation", "presenters"):
+        if style in TALK:
             plan, usage = plan_dialogue(narration, title, cast, target_seconds, log, fmt=style)
         else:
             plan, usage = plan_scenes(narration, title, mode, target_seconds, log)
         plan["made_for"] = key
         (work_dir / "plan.json").write_text(json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    if style in ("conversation", "presenters"):
+    if style in TALK:
         for i, v in enumerate(voices or ()):
             if v:
                 plan["cast"][i]["voice"] = v
@@ -161,6 +167,23 @@ def generate(work_dir: Path, narration: str, title: str = "", theme: str = "midn
         log(f"{len(plan['scenes'])} scenes: {', '.join(s['type'] for s in plan['scenes'])}")
         log(f"Voicing the scenes ({voice}, speed {speed})")
         timeline = narrate(plan, work_dir, voice, speed, log)
+        if mode == "tighten" and timeline["duration"] > target_seconds and speed < MAX_SPEED:
+            faster = min(MAX_SPEED, round(speed * timeline["duration"] / target_seconds + 0.01, 2))
+            log(f"{timeline['duration']:.0f}s is over the {target_seconds}s asked for - speaking at {faster}x")
+            timeline = narrate(plan, work_dir, voice, faster, log)
+    if style == "conversation3d":
+        from explainer import office3d
+        out = office3d.render(work_dir, timeline, log, progress, captions, music, avatars=cast,
+                              logo=work_dir / "logo.png" if (work_dir / "logo.png").exists() else None,
+                              brand=timeline.get("brand"), brand_name=brand_name)
+        return out, usage
+    if style == "hitech":
+        from explainer import hitech
+        saved_logo = work_dir / "logo.png"
+        out = hitech.render(work_dir, timeline, theme, log, progress, captions, music,
+                            logo=saved_logo if saved_logo.exists() else None,
+                            brand=brand_colors(saved_logo) if saved_logo.exists() else None, brand_name=brand_name)
+        return out, usage
     render.write_player(work_dir, timeline, theme)
     out = render.render(work_dir, timeline, log, progress, captions, music)
     return out, usage

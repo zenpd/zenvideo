@@ -27,7 +27,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from explainer.dialogue import CAST, DEFAULT_CAST, DEFAULT_STUDIO, STUDIO_CAST
+from explainer.dialogue import CAST, DEFAULT_CAST, DEFAULT_STUDIO, STUDIO_CAST, presets_for
 from explainer.planner import MODES
 from explainer.render import THEMES
 from explainer.service import STYLES
@@ -300,11 +300,9 @@ def _check(look: dict) -> dict:
         raise HTTPException(422, f"Captions must be one of {', '.join(CAPTIONS)}")
     if look["style"] not in STYLES:
         raise HTTPException(422, f"Unknown style '{look['style']}'")
-    presets = STUDIO_CAST if look["style"] == "presenters" else CAST
-    if look["style"] == "presenters" and not all(c in STUDIO_CAST for c in look["cast"]):
-        look["cast"] = list(DEFAULT_STUDIO)
-    if look["style"] == "conversation" and not all(c in CAST for c in look["cast"]):
-        look["cast"] = list(DEFAULT_CAST)
+    presets, default = presets_for(look["style"] if look["style"] in ("presenters", "conversation3d") else "conversation")
+    if not all(c in presets for c in look["cast"]):
+        look["cast"] = list(default)
     if len(look["cast"]) != 2 or any(c not in presets for c in look["cast"]) or look["cast"][0] == look["cast"][1]:
         raise HTTPException(422, "Pick two different people")
     look["brand_name"] = (look.get("brand_name") or "").strip()[:60]
@@ -328,13 +326,19 @@ def options():
                          {"id": "none", "label": "None"}],
             "styles": [{"id": "explainer", "label": "Explainer", "hint": "Motion graphics: points, steps and numbers animate in as they are said"},
                        {"id": "conversation", "label": "Conversation", "hint": "Two colleagues talk it through in an office"},
-                       {"id": "presenters", "label": "Presenters", "hint": "Two presenters in a branded studio, your logo behind them"}],
+                       {"id": "presenters", "label": "Presenters", "hint": "Two presenters in a branded studio, your logo behind them"},
+                       {"id": "hitech", "label": "Hi-tech", "hint": "Glowing motion graphics with shader transitions, rendered by HyperFrames"},
+                       {"id": "conversation3d", "label": "3D conversation", "hint": "Two realistic 3D office people talk it through (Microsoft Rocketbox)"}],
             "cast": [{"id": k, **{x: c[x] for x in ("name", "voice", "skin", "hair", "hair_style", "top", "top2", "glasses", "beard")}}
                      for k, c in CAST.items()],
             "studio_cast": [{"id": k, "name": c["name"], "voice": c["voice"], "skin": c["skin"], "hair": c["hair"],
                              "hair_style": "long" if c["hair_style"] == "shoulder" else c["hair_style"], "top": c["suit"],
                              "glasses": False, "beard": False} for k, c in STUDIO_CAST.items()],
-            "default_cast": list(DEFAULT_CAST), "default_studio": list(DEFAULT_STUDIO)}
+            "cast3d": [{"id": k, "name": a["name"], "voice": a["voice"], "hair_style": "long" if a["set"] == "f" else "short",
+                        "skin": "#e6bc9c", "hair": "#2e221b", "top": "#2d3036", "glasses": False, "beard": False}
+                       for k, a in presets_for("conversation3d")[0].items()],
+            "default_cast": list(DEFAULT_CAST), "default_studio": list(DEFAULT_STUDIO),
+            "default_3d": list(presets_for("conversation3d")[1])}
 
 
 @router.get("/videos")

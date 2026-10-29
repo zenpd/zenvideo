@@ -26,3 +26,6 @@ storage_state*.json
 # Studio web app
 studio/node_modules/
 studio/dist/
+# HyperFrames tooling for the explainer (npm install in explainer/hyperframes)
+explainer/hyperframes/node_modules/
+explainer/hyperframes/package-lock.json

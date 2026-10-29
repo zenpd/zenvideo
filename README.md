@@ -255,6 +255,13 @@ a theme and voices, and click **Make video**. A 2-minute video takes about 4-6 m
 cent). There are two styles:
 
 - **Explainer** - motion graphics, described below.
+- **Hi-tech** - the explainer's scenes as glowing kinetic motion graphics (dark scenes with drifting glows, a moving
+  perspective grid, kinetic headlines, counters, steps lighting up) with WebGL shader transitions between scenes
+  (domain warp, cinematic zoom, light leak, whip pan, glitch, ...), rendered by [HyperFrames](https://github.com/heygen-com/hyperframes)
+  (HeyGen's open-source HTML-to-video engine, Apache 2.0 - free, runs locally). One-time setup: `npm install` in
+  `explainer/hyperframes` (versions pinned there). Telemetry and update checks are switched off, GSAP and the shaders
+  are copied into each project (no CDN), and it uses the FFmpeg and headless Chrome the pipeline already has. Slower to
+  render than the other styles: about 6-8x the video's length (a 90-second video takes about 10 minutes).
 - **Conversation** - two colleagues talk the narration through at a desk in an office: one asks the questions a viewer
   would ask, the other explains. One AI call writes the dialogue from the narration (every line fact-checked like the
   explainer's scenes: figures and names only from the narration and the two people's own names). Pick the two people
@@ -291,6 +298,7 @@ From the command line:
 python -m explainer narration.txt --title "Zen Studio" --theme midnight --voice af_sky
 python -m explainer notes.txt --tighten --seconds 90 --captions burned --out build/explainers/short
 python -m explainer narration.txt --style conversation --cast maya daniel --seconds 120 --theme daylight
+python -m explainer script.txt --style hitech --tighten --seconds 85 --voice bf_emma --logo logo.png --brand "Cynergy Bank"
 ```
 
 ---
