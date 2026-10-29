@@ -20,6 +20,8 @@ const base = "/api/studio";
 const post = (path, body) => request(base + path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
 const ppt = "/api/ppt";   // the PPT skill
 const pptPost = (path, body) => request(ppt + path, { method: "POST", body: JSON.stringify(body || {}) });
+const ex = "/api/explainer";   // the explainer skill: animated videos
+const exPost = (path, body) => request(ex + path, { method: "POST", body: JSON.stringify(body || {}) });
 
 export const api = {
   options: () => request(`${base}/options`),
@@ -46,6 +48,14 @@ export const api = {
   removeDeck: (id) => request(`${ppt}/decks/${id}`, { method: "DELETE" }),
   deckDownloadUrl: (id, name) => `${ppt}/decks/${id}/files/${name}`,
   deckShotUrl: (id, file) => `${ppt}/decks/${id}/pages/${file}`,
+  // the explainer skill (/api/explainer): animated explainer videos from a narration
+  explainerOptions: () => request(`${ex}/options`),
+  explainers: () => request(`${ex}/videos`),
+  explainer: (id) => request(`${ex}/videos/${id}`),
+  createExplainer: (body) => exPost("/videos", body),
+  buildExplainer: (id, body) => exPost(`/videos/${id}/build`, body),
+  removeExplainer: (id) => request(`${ex}/videos/${id}`, { method: "DELETE" }),
+  explainerFileUrl: (id, name) => `${ex}/videos/${id}/files/${name}`,
   fileUrl: (id, name) => `${base}/jobs/${id}/files/${name}`,
   eventsUrl: (id) => `${base}/jobs/${id}/events`,
 };

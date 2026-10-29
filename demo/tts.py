@@ -123,8 +123,9 @@ def _phones(s: str) -> str:
     return "".join(c for c in s if c not in _PHONE_MARKS and not c.isspace() and c not in ".,!?;:—…\"'()-")
 
 
-def synthesize_timed(text: str, voice: str, speed: float, lang: str, toks: list[str]):
-    """Same audio as Kokoro.create(), plus the exact start/end of every script token."""
+def synthesize_timed(text: str, voice: str, speed: float, lang: str, toks: list[str], phones: list | None = None):
+    """Same audio as Kokoro.create(), plus the exact start/end of every script token. phones (a list, optional)
+    receives every phoneme as (phoneme, start, end) - e.g. for lip-sync."""
     from kokoro_onnx.config import MAX_PHONEME_LENGTH, SAMPLE_RATE
     from kokoro_onnx.trim import trim as trim_audio
 
@@ -150,6 +151,8 @@ def synthesize_timed(text: str, voice: str, speed: float, lang: str, toks: list[
         parts.append(trimmed)
         offset += len(trimmed)
     samples = np.concatenate(parts) if parts else np.zeros(1, dtype=np.float32)
+    if phones is not None:
+        phones.extend((c, round(float(st), 3), round(float(en), 3)) for c, st, en in stream)
 
     expected = [(c, ti) for ti, tok in enumerate(toks) for c in _phones(k.tokenizer.phonemize(tok, lang))]
     spans: list[list[float] | None] = [None] * len(toks)

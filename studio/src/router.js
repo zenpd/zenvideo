@@ -22,7 +22,9 @@ export function useRoute() {
   if (deck) return { page: "deck", id: deck[1], path };
   const linkDeck = path.match(/^\/decks\/([\w-]+)$/);
   if (linkDeck && linkDeck[1] !== "new") return { page: "linkdeck", id: linkDeck[1], path };
+  const explainer = path.match(/^\/explainers\/([\w-]+)$/);
+  if (explainer && explainer[1] !== "new") return { page: "explainer", id: explainer[1], path };
   const page = { "/": "home", "/new": "new", "/videos": "library", "/settings": "settings", "/decks": "decks",
-    "/decks/new": "newdeck" }[path] || "home";
+    "/decks/new": "newdeck", "/explainers": "explainers", "/explainers/new": "newexplainer" }[path] || "home";
   return { page, path };
 }

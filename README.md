@@ -1,10 +1,12 @@
 # ZenVideo — Zen Studio
 
-Zen Studio has two independent skills:
+Zen Studio has three independent skills:
 
 - **Video**: a web app URL and a narration transcript become a finished demo video (MP4).
 - **PPT**: a narration, call transcript or notes become a pitch deck (PPTX) in one of six designs. It works on its own,
   or from a finished video's narration.
+- **Animated video**: a narration becomes an animated video (MP4) - motion graphics that show each point as it is
+  said, or two colleagues talking it through in an office.
 
 For a video, Zen Studio drafts the on-screen steps with Azure OpenAI, you review them, and it then:
 
@@ -13,8 +15,8 @@ For a video, Zen Studio drafts the on-screen steps with Azure OpenAI, you review
 3. renders the final video with auto-zoom, click effects, word-highlighted captions and optional background music,
 4. runs an automatic audio/video sync check.
 
-Everything runs on your own machine. The only cloud calls are to Azure OpenAI: drafting the video script, and
-writing a deck's story.
+Everything runs on your own machine. The only cloud calls are to Azure OpenAI: drafting the video script, writing a
+deck's story, and planning an animated video's scenes.
 
 ---
 
@@ -241,7 +243,54 @@ From the command line:
 ```powershell
 python -m ppt narration.txt --template consulting          # -> narration.pptx
 python -m ppt call.vtt --template pitch-dark --title "ShiftBoard"
-python -m ppt --url https://your-app.example.com --try-forms --out app.pptx    # from the app alone"
+python -m ppt --url https://your-app.example.com --try-forms --out app.pptx    # from the app alone
+```
+
+---
+
+## Making an animated video
+
+**Animated videos → New animated video**: write or paste a narration (about 300 words make two minutes), pick a style,
+a theme and voices, and click **Make video**. A 2-minute video takes about 4-6 minutes and one AI call (well under a
+cent). There are two styles:
+
+- **Explainer** - motion graphics, described below.
+- **Conversation** - two colleagues talk the narration through at a desk in an office: one asks the questions a viewer
+  would ask, the other explains. One AI call writes the dialogue from the narration (every line fact-checked like the
+  explainer's scenes: figures and names only from the narration and the two people's own names). Pick the two people
+  from six presets (each with their own look and voice; any Kokoro voice can be chosen instead) and the length.
+  - **Lip-sync** from the voice model itself: Kokoro's exact phoneme timings become mouth shapes (closed, open, wide,
+    round, teeth, lip under teeth), so no extra lip-sync tool is needed.
+  - **Acting**: gestures fitted to each line (explaining, listing, open hands for questions, thinking, pointing at the
+    wall screen, a wave hello), head movement and nods on the speech's beats, the listener tilting towards the speaker
+    and nodding, blinks, both glancing at the screen when it changes.
+  - **The wall screen** between them shows the key points (a title, up to three points, or a figure), each appearing
+    as it is said; the camera opens on the office with the video's title, cuts between the speakers and pulls back to
+    take in the screen, and name tags introduce the two people. The office follows the theme (night, day, sunset).
+
+The explainer style:
+
+- **Scenes:** one Azure OpenAI call splits the narration into scenes and decides what each shows: a title, a
+  statement, key points, numbers, steps, before/after, a chart, an icon grid, a quote and a closing. Everything on
+  screen is checked in code: figures and names only from the narration (no chart from numbers nobody said), a call
+  to action only when the narration makes it, short scenes merged so nothing flashes by.
+- **In sync with the voice:** Kokoro voices each scene with exact word timings, and every point, step or number
+  animates in just as its words are said (each item has a "cue" from the voice-over).
+- **Voice-over:** *Word for word* speaks your narration exactly; *AI tightens it* rewrites it to a target length,
+  keeping its facts.
+- **Look:** four themes (Midnight, Daylight, Sunrise, Forest), any Kokoro voice and speed, captions switchable,
+  always on or off, background music on or off. Changing any of these and clicking **Remake video** reuses the scene
+  plan: no AI call. **New scene plan** asks the AI again.
+- **How it is drawn:** the scenes are an HTML page (`player.html`) whose animations all run from one clock, so every
+  frame is taken exactly (no screen recording) in a few hidden browsers in parallel. **Open the animation in a
+  browser** plays it live with its voice-over.
+
+From the command line:
+
+```powershell
+python -m explainer narration.txt --title "Zen Studio" --theme midnight --voice af_sky
+python -m explainer notes.txt --tighten --seconds 90 --captions burned --out build/explainers/short
+python -m explainer narration.txt --style conversation --cast maya daniel --seconds 120 --theme daylight
 ```
 
 ---
@@ -255,9 +304,11 @@ python -m ppt --url https://your-app.example.com --try-forms --out app.pptx    #
 | `studio/` | Zen Studio web UI (React + Vite) |
 | `demo/` | Video skill pipeline: `draft` (Azure script), `tts`, `record`, `capture`, `retime`, `render`, `effects`, `check` |
 | `ppt/` | PPT skill: `source` (text cleaning), `writer` (story), `designs/`, `capture` (explores an app's link), `service`, `api` (`/api/ppt`) |
+| `explainer/` | Animated video skill: `planner` (explainer scenes), `dialogue` (conversation and cast), `voice` (voice-over, lip-sync and timeline), `web/` (the players: `player.*` scenes, `office.*` conversation), `render` (frames → MP4), `service`, `api` (`/api/explainer`) |
 | `demo/examples/` | Example scripts, transcripts and a sample app |
 | `build/studio/<job id>/` | Each video job: `job.json`, `job.log`, `demo.yaml`, `en/final.mp4` … (git-ignored) |
 | `build/decks/<deck id>/` | Each pitch deck: `job.json`, `narration.txt`, `pages/` + `pages.json` (the explored app), `deck.json` (the story), `deck*.pptx` (git-ignored) |
+| `build/explainers/<id>/` | Each animated video: `job.json`, `narration.txt`, `plan.json` (the scenes or dialogue), `timeline.json`, `audio/`, `player.html`, `final.mp4`, `final.srt` (git-ignored) |
 | `music/` | Background music tracks (`.mp3`) |
 | `models/` | Generated timed voice model, optional Whisper model (git-ignored) |
 

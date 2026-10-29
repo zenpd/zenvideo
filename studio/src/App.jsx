@@ -10,6 +10,7 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import NewVideoPage from "./pages/NewVideoPage.jsx";
 import JobPage from "./pages/JobPage.jsx";
 import DecksPage, { LinkDeckPage, NewDeckPage } from "./pages/DecksPage.jsx";
+import ExplainersPage, { ExplainerPage, NewExplainerPage } from "./pages/ExplainersPage.jsx";
 import LibraryPage from "./pages/LibraryPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 
@@ -139,7 +140,8 @@ function Shell() {
   };
 
   const current = (page) => (route.page === page || (page === "library" && ["job", "deck"].includes(route.page))
-    || (page === "decks" && ["newdeck", "linkdeck"].includes(route.page)) ? "page" : undefined);
+    || (page === "decks" && ["newdeck", "linkdeck"].includes(route.page))
+    || (page === "explainers" && ["newexplainer", "explainer"].includes(route.page)) ? "page" : undefined);
 
   let page;
   if (route.page === "new") page = <NewVideoPage options={options} />;
@@ -148,6 +150,9 @@ function Shell() {
   else if (route.page === "decks") page = <DecksPage />;
   else if (route.page === "newdeck") page = <NewDeckPage />;
   else if (route.page === "linkdeck") page = <LinkDeckPage id={route.id} />;
+  else if (route.page === "explainers") page = <ExplainersPage />;
+  else if (route.page === "newexplainer") page = <NewExplainerPage />;
+  else if (route.page === "explainer") page = <ExplainerPage id={route.id} />;
   else if (route.page === "library") page = <LibraryPage search={search} setSearch={setSearch} />;
   else if (route.page === "settings") page = <SettingsPage options={options} settings={settings} setSettings={setSettings} />;
   else page = <DashboardPage options={options} jobs={jobs} stats={stats} target={target} />;
@@ -248,6 +253,7 @@ function Shell() {
             {stats.active > 0 && <span className="nav-count" aria-label={`${stats.active} in progress`}>{stats.active}</span>}
           </a>
           <a className="nav-item" href="#/decks" aria-current={current("decks")}><Icon name="presentation" />Pitch decks</a>
+          <a className="nav-item" href="#/explainers" aria-current={current("explainers")}><Icon name="sparkles" />Animated videos</a>
           <a className="nav-item" href="#/settings" aria-current={current("settings")}><Icon name="settings" />Settings</a>
         </nav>
         <div className="nav-label" id="recent-label">Recent videos</div>

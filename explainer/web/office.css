@@ -1,0 +1,88 @@
+/* The conversation style: two people at a desk in an office, a wall screen between them. 1920x1080 design pixels;
+   every movement is set by seek(t) in office.js (no CSS transitions), so any frame can be rendered exactly. */
+
+:root {
+  --accent: #22d3ee; --accent2: #a78bfa; --bg1: #0b1020; --bg2: #1b1450; --ink: #fff; --muted: #aab3d9; --on-accent: #06202a;
+  --wall1: #283046; --wall2: #1f2538; --panel: #313a57; --sky1: #0b1430; --sky2: #2a3566; --city: #141b33;
+  --lit: #ffd27a; --desk1: #6b4a33; --desk2: #4e3524; --shelf: #3b3f55; --frame: #e8ecf4; --chair: #1d2233;
+  --floor: #171b29; --glow: rgba(255, 220, 160, .10);
+}
+.theme-daylight {
+  --accent: #2563eb; --accent2: #0d9488; --bg1: #0f172a; --bg2: #1e3a8a; --on-accent: #fff;
+  --wall1: #eef2f7; --wall2: #e1e7ef; --panel: #dbe5f5; --sky1: #9fd3ff; --sky2: #e6f4ff; --city: #a9bccf;
+  --lit: #e6f4ff; --desk1: #caa074; --desk2: #9d7149; --shelf: #c9a77f; --frame: #ffffff; --chair: #3b4252;
+  --floor: #cfd6e0; --glow: rgba(255, 255, 255, .25);
+}
+.theme-sunrise {
+  --accent: #fb923c; --accent2: #f472b6; --bg1: #1c0f2e; --bg2: #4a1638; --on-accent: #2a0d06;
+  --wall1: #f4e7dd; --wall2: #e9d5c6; --panel: #f1d4c4; --sky1: #ff8a65; --sky2: #ffd6a5; --city: #9c5b66;
+  --lit: #ffe2b8; --desk1: #b27a51; --desk2: #855637; --shelf: #b98d6a; --frame: #fff8f2; --chair: #4a2c3f;
+  --floor: #d9c0b0; --glow: rgba(255, 200, 150, .22);
+}
+.theme-forest {
+  --accent: #16a34a; --accent2: #ca8a04; --bg1: #06140f; --bg2: #0f3b2e; --on-accent: #fff;
+  --wall1: #e8f0ea; --wall2: #d8e5dc; --panel: #d3e6d9; --sky1: #bfe8d2; --sky2: #f0fbf4; --city: #8fb3a0;
+  --lit: #f0fbf4; --desk1: #a9845f; --desk2: #7c5f43; --shelf: #a98a66; --frame: #ffffff; --chair: #2f3b34;
+  --floor: #c9d6cc; --glow: rgba(255, 255, 255, .25);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; background: var(--wall2);
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.preview #stage { position: absolute; left: 0; top: 0; }
+.ic { font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets"; font-style: normal; line-height: 1; }
+#cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+#cam > svg, #cam > .layer { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: visible; }
+
+/* the wall screen's content */
+.tv { position: absolute; left: 666px; top: 196px; width: 588px; height: 318px; overflow: hidden; border-radius: 8px;
+  background: radial-gradient(120% 130% at 10% 0%, var(--bg2), var(--bg1) 70%); color: #fff; }
+.tv .slide { position: absolute; inset: 0; padding: 34px 40px; display: flex; flex-direction: column; justify-content: center; }
+.tv .kick { font-size: 15px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+.tv .ttl { font-size: 38px; font-weight: 800; line-height: 1.08; letter-spacing: -.6px; }
+.tv .pts { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.tv .pt { display: flex; align-items: center; gap: 14px; font-size: 25px; font-weight: 650; line-height: 1.15; }
+.tv .pt .dot { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 16px;
+  color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+.tv .val { font-size: 96px; font-weight: 800; letter-spacing: -3px; line-height: 1; margin-top: 8px;
+  background: linear-gradient(100deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tv .logo { width: 86px; height: 86px; border-radius: 24px; display: grid; place-items: center; font-size: 46px; font-weight: 800;
+  color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--accent2)); margin-bottom: 18px; }
+.tv .splash { align-items: center; text-align: center; }
+.tv .splash.brand { background: #fff; color: var(--bg1); }
+.tv .splash.brand img { max-width: 420px; max-height: 80px; margin-bottom: 18px; }
+.tv .splash.brand .ttl { font-size: 30px; }
+.sign { position: absolute; left: 745px; top: 84px; width: 430px; height: 80px; border-radius: 14px; background: #fff;
+  display: grid; place-items: center; box-shadow: 0 12px 30px rgba(0, 0, 0, .22); }
+.sign img { max-width: 380px; max-height: 56px; display: block; }
+.sign .word { font-size: 38px; font-weight: 700; color: var(--bg1); }
+.closing .plate { background: #fff; border-radius: 22px; padding: 26px 42px; margin-bottom: 44px; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+.closing .plate img { max-width: 560px; max-height: 88px; display: block; }
+.tv .glare { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 38%); pointer-events: none; }
+
+/* overlays (not moved by the camera) */
+.over { position: absolute; z-index: 5; }
+.title-card { left: 90px; bottom: 96px; padding: 34px 44px 34px 40px; border-radius: 26px; max-width: 1100px;
+  background: rgba(10, 14, 28, .78); color: #fff; border-left: 10px solid var(--accent); }
+.title-card .k { font-size: 22px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+.title-card .t { font-size: 66px; font-weight: 800; letter-spacing: -1.4px; line-height: 1.05; margin-top: 8px; }
+.tag { bottom: 70px; display: flex; align-items: center; gap: 16px; padding: 16px 28px 16px 16px; border-radius: 999px;
+  background: rgba(10, 14, 28, .80); color: #fff; }
+.tag .av { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; font-weight: 800;
+  color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+.tag .n { font-size: 30px; font-weight: 800; line-height: 1.05; }
+.tag .r { font-size: 20px; font-weight: 600; color: #c9d1ea; }
+.closing { inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #fff;
+  background: radial-gradient(120% 120% at 15% 10%, var(--bg2) 0%, var(--bg1) 60%); }
+.closing .logo { width: 160px; height: 160px; border-radius: 46px; display: grid; place-items: center; font-size: 86px; font-weight: 800;
+  color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--accent2)); margin-bottom: 46px; }
+.closing .t { font-size: 96px; font-weight: 800; letter-spacing: -2px; line-height: 1.05; max-width: 1500px; }
+.closing .s { font-size: 38px; margin-top: 26px; color: #c9d1ea; max-width: 1300px; line-height: 1.3; }
+.progress { position: absolute; left: 0; bottom: 0; height: 6px; width: 100%; transform-origin: 0 50%; z-index: 6;
+  background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+
+.controls { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.6); color: #fff; font: 14px "Segoe UI", sans-serif; z-index: 10; }
+.controls button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 0; cursor: pointer; }
+.controls input { flex: 1; }

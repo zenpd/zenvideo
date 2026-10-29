@@ -1,0 +1,180 @@
+/* The explainer's stage: 1920x1080 design pixels, scaled to the window when previewed. Every moving part is a Web
+   Animation driven by seek(t) in player.js - no CSS transitions, so any frame can be rendered exactly. */
+
+:root {
+  --bg1: #0b1020; --bg2: #1b1450; --ink: #ffffff; --muted: #aab3d9; --accent: #22d3ee; --accent2: #a78bfa;
+  --card: rgba(255, 255, 255, 0.065); --card-line: rgba(255, 255, 255, 0.12); --good: #34d399; --bad: #fb7185;
+  --on-accent: #06202a; --shadow: 0 30px 80px rgba(0, 0, 0, 0.35); --dots: rgba(255, 255, 255, 0.05);
+  --blob1: rgba(34, 211, 238, 0.30); --blob2: rgba(167, 139, 250, 0.32); --blob3: rgba(59, 130, 246, 0.22);
+}
+.theme-daylight {
+  --bg1: #f8fafc; --bg2: #e3eafc; --ink: #0f172a; --muted: #52607a; --accent: #2563eb; --accent2: #0d9488;
+  --card: #ffffff; --card-line: rgba(15, 23, 42, 0.08); --good: #059669; --bad: #e11d48; --on-accent: #ffffff;
+  --shadow: 0 24px 60px rgba(30, 41, 99, 0.12); --dots: rgba(15, 23, 42, 0.06);
+  --blob1: rgba(37, 99, 235, 0.16); --blob2: rgba(13, 148, 136, 0.14); --blob3: rgba(147, 51, 234, 0.10);
+}
+.theme-sunrise {
+  --bg1: #1c0f2e; --bg2: #4a1638; --ink: #fff7ed; --muted: #f3c6c0; --accent: #fb923c; --accent2: #f472b6;
+  --card: rgba(255, 255, 255, 0.07); --card-line: rgba(255, 255, 255, 0.13); --good: #4ade80; --bad: #f87171;
+  --on-accent: #2a0d06; --dots: rgba(255, 255, 255, 0.05);
+  --blob1: rgba(251, 146, 60, 0.30); --blob2: rgba(244, 114, 182, 0.30); --blob3: rgba(250, 204, 21, 0.16);
+}
+.theme-forest {
+  --bg1: #06140f; --bg2: #0f3b2e; --ink: #f0fdf4; --muted: #a7c9b8; --accent: #4ade80; --accent2: #facc15;
+  --card: rgba(255, 255, 255, 0.06); --card-line: rgba(255, 255, 255, 0.12); --good: #4ade80; --bad: #fb7185;
+  --on-accent: #052e16; --dots: rgba(255, 255, 255, 0.05);
+  --blob1: rgba(74, 222, 128, 0.24); --blob2: rgba(250, 204, 21, 0.16); --blob3: rgba(45, 212, 191, 0.20);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+body { display: grid; place-items: center; }
+#stage {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0;
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; color: var(--ink);
+  background: radial-gradient(120% 120% at 15% 10%, var(--bg2) 0%, var(--bg1) 60%);
+  -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+}
+.preview #stage { position: absolute; left: 0; top: 0; }
+.ic { font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets"; font-style: normal; font-weight: normal; line-height: 1; }
+
+/* background */
+.bg { position: absolute; inset: 0; pointer-events: none; }
+.dots { position: absolute; inset: -40px; background-image: radial-gradient(var(--dots) 2px, transparent 2.5px);
+  background-size: 44px 44px; }
+.blob { position: absolute; border-radius: 50%; }
+.blob.b1 { width: 1100px; height: 1100px; left: -300px; top: -420px;
+  background: radial-gradient(circle, var(--blob1) 0%, transparent 65%); }
+.blob.b2 { width: 1200px; height: 1200px; right: -420px; bottom: -560px;
+  background: radial-gradient(circle, var(--blob2) 0%, transparent 65%); }
+.blob.b3 { width: 800px; height: 800px; left: 45%; top: 30%;
+  background: radial-gradient(circle, var(--blob3) 0%, transparent 65%); }
+
+/* chrome around the scenes */
+.brand { position: absolute; left: 72px; top: 54px; display: flex; align-items: center; gap: 16px; font-size: 28px;
+  font-weight: 650; letter-spacing: 0.2px; z-index: 5; }
+.brand .mark { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 24px;
+  font-weight: 800; color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+.progress { position: absolute; left: 0; bottom: 0; height: 6px; width: 100%; transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2)); z-index: 5; }
+
+/* a scene */
+.scene { position: absolute; inset: 0; visibility: hidden; }
+.cam { position: absolute; inset: 0; }
+.pad { position: absolute; left: 140px; right: 140px; top: 150px; bottom: 120px; display: flex; flex-direction: column; }
+.center { align-items: center; justify-content: center; text-align: center; }
+.h { font-size: 72px; font-weight: 750; line-height: 1.08; letter-spacing: -1.2px; }
+.w { display: inline-block; white-space: pre; }
+.kicker { display: inline-flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 700; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--accent); padding: 12px 26px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.muted { color: var(--muted); }
+.card { background: var(--card); border: 2px solid var(--card-line); border-radius: 32px; box-shadow: var(--shadow); }
+.badge { display: grid; place-items: center; border-radius: 50%; color: var(--on-accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+.grad { background: linear-gradient(100deg, var(--accent), var(--accent2)); -webkit-background-clip: text;
+  background-clip: text; color: transparent; }
+
+/* title */
+.t-title .title { font-size: 116px; font-weight: 800; line-height: 1.02; letter-spacing: -2.5px; max-width: 1500px;
+  margin: 40px 0 34px; }
+.t-title .subtitle { font-size: 40px; font-weight: 450; max-width: 1200px; line-height: 1.3; }
+.ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 2px solid var(--card-line); }
+.underline { width: 260px; height: 10px; border-radius: 10px; margin-top: 40px; transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+
+/* statement */
+.t-statement .text { font-size: 92px; font-weight: 760; line-height: 1.12; letter-spacing: -1.8px; max-width: 1560px; }
+.t-statement .hl { position: relative; color: var(--accent); }
+.t-statement .mark { position: absolute; left: -6px; right: -6px; bottom: 6px; height: 22px; border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 26%, transparent); transform-origin: 0 50%; z-index: -1; }
+.t-statement .bigicon { width: 150px; height: 150px; font-size: 72px; margin-bottom: 56px; }
+
+/* points */
+.t-points .cols { display: flex; flex: 1; align-items: center; gap: 110px; margin-top: 30px; }
+.t-points .list { flex: 1; display: flex; flex-direction: column; gap: 30px; }
+.t-points .row { display: flex; align-items: center; gap: 34px; padding: 26px 34px; }
+.t-points .row .badge { width: 92px; height: 92px; font-size: 42px; flex: none; }
+.t-points .row .txt { font-size: 44px; font-weight: 650; line-height: 1.15; }
+.t-points .hero { position: relative; width: 520px; height: 520px; flex: none; }
+.t-points .hero .disc { position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--accent) 40%, transparent), transparent 70%),
+              var(--card); border: 2px solid var(--card-line); }
+.t-points .hero .ic { position: absolute; inset: 0; display: grid; place-items: center; font-size: 220px; color: var(--accent); }
+
+/* stats */
+.t-stats .grid { flex: 1; display: flex; gap: 48px; align-items: center; justify-content: center; }
+.t-stats .stat { flex: 1; max-width: 520px; height: 520px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center; padding: 40px; position: relative; }
+.t-stats .value { font-size: 150px; font-weight: 800; letter-spacing: -4px; line-height: 1; font-variant-numeric: tabular-nums; }
+.t-stats .label { font-size: 36px; font-weight: 550; margin-top: 26px; line-height: 1.25; color: var(--muted); }
+.t-stats svg { position: absolute; inset: 30px; width: calc(100% - 60px); height: calc(100% - 60px); }
+
+/* steps */
+.t-steps .track { position: relative; display: flex; justify-content: space-between; align-items: flex-start;
+  margin: auto 0; padding-bottom: 40px; }
+.t-steps .line { position: absolute; left: 0; right: 0; top: 68px; height: 8px; border-radius: 8px; background: var(--card-line); }
+.t-steps .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 8px; transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.t-steps .step { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; width: 300px; }
+.t-steps .node { width: 144px; height: 144px; border-radius: 50%; display: grid; place-items: center; font-size: 60px;
+  background: var(--bg1); border: 6px solid var(--card-line); color: var(--muted); position: relative; }
+.t-steps .node .on { position: absolute; inset: -6px; border-radius: 50%; display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--on-accent); }
+.t-steps .num { position: absolute; top: -14px; right: -14px; width: 50px; height: 50px; border-radius: 50%; font-size: 24px;
+  font-weight: 800; display: grid; place-items: center; background: var(--ink); color: var(--bg1); }
+.t-steps .name { font-size: 38px; font-weight: 750; margin-top: 34px; }
+.t-steps .txt { font-size: 28px; margin-top: 12px; line-height: 1.3; color: var(--muted); }
+
+/* compare */
+.t-compare .cols { display: flex; gap: 60px; align-items: stretch; margin: auto 0; position: relative; }
+.t-compare .col { min-height: 420px; }
+.t-compare .col { flex: 1; padding: 44px 50px; display: flex; flex-direction: column; gap: 26px; }
+.t-compare .lbl { font-size: 30px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+.t-compare .before .lbl { color: var(--bad); }
+.t-compare .after .lbl { color: var(--good); }
+.t-compare .after { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.t-compare .item { display: flex; align-items: center; gap: 24px; font-size: 38px; font-weight: 600; line-height: 1.2; }
+.t-compare .item .ic { width: 60px; height: 60px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 28px; }
+.t-compare .before .item .ic { color: var(--bad); background: color-mix(in srgb, var(--bad) 16%, transparent); }
+.t-compare .after .item .ic { color: var(--good); background: color-mix(in srgb, var(--good) 18%, transparent); }
+.t-compare .before .item { color: var(--muted); }
+.t-compare .vs { position: absolute; left: 50%; top: 50%; width: 110px; height: 110px; margin: -55px 0 0 -55px; font-size: 48px; z-index: 2; }
+
+/* chart */
+.t-chart .plot { position: relative; flex: 1; margin-top: 50px; display: flex; align-items: flex-end; gap: 46px;
+  padding: 0 40px; border-bottom: 4px solid var(--card-line); }
+.t-chart .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.t-chart .col { width: 100%; max-width: 200px; border-radius: 22px 22px 6px 6px; transform-origin: 50% 100%;
+  background: linear-gradient(180deg, var(--accent), var(--accent2)); }
+.t-chart .num { font-size: 46px; font-weight: 800; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
+.t-chart .labels { display: flex; gap: 46px; padding: 18px 40px 0; }
+.t-chart .labels div { flex: 1; text-align: center; font-size: 30px; font-weight: 600; color: var(--muted); }
+.t-chart .takeaway { font-size: 34px; font-weight: 600; margin-top: 26px; }
+
+/* icons */
+.t-icons .grid { flex: 1; display: grid; gap: 40px; align-content: center; margin-top: 30px; }
+.t-icons .tile { height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px;
+  text-align: center; padding: 30px; }
+.t-icons .tile .badge { width: 130px; height: 130px; font-size: 60px; }
+.t-icons .tile .lbl { font-size: 38px; font-weight: 700; line-height: 1.15; }
+
+/* quote */
+.t-quote .q { font-size: 360px; line-height: 0.6; height: 160px; font-weight: 800; font-family: Georgia, serif; }
+.t-quote .text { font-size: 70px; font-weight: 600; line-height: 1.2; max-width: 1500px; letter-spacing: -0.8px; }
+.t-quote .who { font-size: 34px; margin-top: 50px; color: var(--muted); font-weight: 600; }
+
+/* closing */
+.t-closing .logo { width: 170px; height: 170px; border-radius: 48px; font-size: 90px; font-weight: 800; margin-bottom: 54px;
+  box-shadow: 0 0 0 0 transparent; }
+.t-closing .title { font-size: 104px; font-weight: 800; letter-spacing: -2.4px; line-height: 1.05; max-width: 1500px; }
+.t-closing .subtitle { font-size: 40px; margin-top: 30px; max-width: 1200px; line-height: 1.3; }
+.t-closing .cta { margin-top: 62px; font-size: 36px; font-weight: 750; padding: 26px 56px; border-radius: 999px;
+  color: var(--on-accent); background: linear-gradient(100deg, var(--accent), var(--accent2)); position: relative; }
+.t-closing .glow { position: absolute; inset: 0; border-radius: 999px; border: 4px solid var(--accent); }
+
+/* preview controls (not in rendered frames) */
+.controls { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.6); color: #fff; font: 14px "Segoe UI", sans-serif; z-index: 10; }
+.controls button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 0; cursor: pointer; }
+.controls input { flex: 1; }
