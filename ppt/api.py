@@ -4,12 +4,18 @@ explored page by page (ppt.capture) and its screens become material and screensh
 that video (source_video records which one, for linking back).
 
 Each deck lives in build/decks/<id>/ (job.json, job.log, narration.txt, and from ppt.service: pages/, pages.json,
-deck.json - the story - and deck*.pptx), so the list survives restarts. Switching design reuses the story (no tokens);
+deck.json - the story - deck*.pptx, preview/<design>/ - a picture of every slide - and revisions/), so the list
+survives restarts.
+
+Review before it is final: a generated deck is "review" - the studio shows every slide; the user comments on slides or
+the whole deck and "revise" has Azure change the story accordingly (one call, same fact checks), rebuilt and shown
+again, as often as needed; "approve" makes it final ("done"). Switching design keeps an approved story approved. Switching design reuses the story (no tokens);
 'rewrite' asks Azure for a new story, 'recapture' visits the app again. Every Azure call's tokens and estimated cost
 are added up in job["usage"].
 """
 
 import datetime
+import hashlib
 import json
 import re
 import shutil
@@ -107,23 +113,41 @@ def _view(deck_id: str, logs: int = 40) -> dict:
         job["requests"] = json.loads((d / "deck.json").read_text(encoding="utf-8")).get("requests") or []
     except (OSError, json.JSONDecodeError):
         job["requests"] = []
+    from ppt.service import revisions
+    shown = d / "preview" / (job.get("template") or "")
+    job["preview"] = sorted(p.name for p in shown.glob("[0-9][0-9].png")) if job.get("template") and shown.exists() else []
+    job["revisions"] = revisions(d)
     with _lock:
         job["logs"] = _logs.get(deck_id, [])[-logs:]
     return job
 
 
-def _worker(deck_id: str, template: str, rewrite: bool, recapture: bool) -> None:
+def _story_hash(deck_id: str) -> str:
+    """A fingerprint of the deck's story - what the user approves (the design can change without a new review)."""
+    try:
+        story = json.loads((_dir(deck_id) / "deck.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    keep = {k: story.get(k) for k in ("app_name", "tagline", "pitch", "slides")}
+    return hashlib.sha256(json.dumps(keep, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def _worker(deck_id: str, template: str, rewrite: bool, recapture: bool, comments: list | None = None) -> None:
     job = _get(deck_id)
     try:
         from pptx import Presentation
 
-        from ppt.service import generate
+        from ppt.service import generate, preview, revise
         narration = _dir(deck_id) / "narration.txt"
-        out, usage = generate(_dir(deck_id), template,
-                              narration=narration.read_text(encoding="utf-8") if narration.exists() else "",
-                              title=job.get("custom_title") or "", url=job.get("url") or "",
-                              rewrite=rewrite, recapture=recapture, log=lambda m: _log(deck_id, m),
-                              brief=job.get("brief"), try_forms=bool(job.get("try_forms")))
+        common = dict(narration=narration.read_text(encoding="utf-8") if narration.exists() else "",
+                      title=job.get("custom_title") or "", url=job.get("url") or "", log=lambda m: _log(deck_id, m),
+                      brief=job.get("brief"))
+        if comments:
+            out, changes, usage = revise(_dir(deck_id), template, comments, **common)
+        else:
+            out, usage = generate(_dir(deck_id), template, rewrite=rewrite, recapture=recapture,
+                                  try_forms=bool(job.get("try_forms")), **common)
+        preview(_dir(deck_id), template, log=lambda m: _log(deck_id, m))
         slides = len(Presentation(out).slides)
         story = json.loads((_dir(deck_id) / "deck.json").read_text(encoding="utf-8"))
         with _lock:
@@ -134,17 +158,21 @@ def _worker(deck_id: str, template: str, rewrite: bool, recapture: bool) -> None
             total = {"calls": total["calls"] + 1, "input_tokens": total["input_tokens"] + usage["input_tokens"],
                      "output_tokens": total["output_tokens"] + usage["output_tokens"],
                      "cost_usd": round(total["cost_usd"] + usage["cost_usd"], 6), "model": usage["model"]}
-        _update(deck_id, status="done", error=None, slides=slides, decks=decks, usage=total, last_usage=usage,
-                title=job.get("custom_title") or story.get("app_name") or job["title"])
+        # a story the user has not approved yet waits for their review; an approved one stays approved
+        approved = bool(job.get("approved")) and job.get("approved") == _story_hash(deck_id)
+        _update(deck_id, status="done" if approved else "review", error=None, slides=slides, decks=decks, usage=total,
+                last_usage=usage, title=job.get("custom_title") or story.get("app_name") or job["title"])
     except Exception as e:  # noqa: BLE001 - shown on the deck's page
         _log(deck_id, f"ERROR: {e}")
         _update(deck_id, status="failed", error=str(e).splitlines()[0][:300])
 
 
-def _start(deck_id: str, template: str, rewrite: bool = False, recapture: bool = False) -> None:
+def _start(deck_id: str, template: str, rewrite: bool = False, recapture: bool = False,
+           comments: list | None = None) -> None:
     _update(deck_id, status="running", template=template, error=None)
-    _log(deck_id, f"Generating the pitch deck ({DESIGNS[template].name})...")
-    threading.Thread(target=_worker, args=(deck_id, template, rewrite, recapture), daemon=True).start()
+    _log(deck_id, f"Revising the pitch deck ({DESIGNS[template].name})..." if comments else
+         f"Generating the pitch deck ({DESIGNS[template].name})...")
+    threading.Thread(target=_worker, args=(deck_id, template, rewrite, recapture, comments), daemon=True).start()
 
 
 def _check_template(template: str) -> None:
@@ -259,6 +287,56 @@ def build_deck(deck_id: str, body: Build):
             "instructions": old["instructions"] if body.instructions is None else body.instructions}))
     _start(deck_id, body.template, rewrite=body.rewrite or body.recapture, recapture=body.recapture)
     return _view(deck_id)
+
+
+class Comment(BaseModel):
+    slide: int | None = None   # the slide's number as the preview shows it (1: the title slide); None: the whole deck
+    comment: str
+
+
+class Revise(BaseModel):
+    template: str = DEFAULT
+    comments: list[Comment]
+
+
+@router.post("/decks/{deck_id}/revise")
+def revise_deck(deck_id: str, body: Revise):
+    """Change the deck as the review comments say (one Azure call), rebuild it and its preview; it stays in review."""
+    job = _get(deck_id)
+    _check_template(body.template)
+    if job["status"] == "running":
+        raise HTTPException(409, "The deck is being generated")
+    comments = [c.model_dump() for c in body.comments if c.comment.strip()]
+    if not comments:
+        raise HTTPException(422, "Write at least one comment")
+    if len(comments) > 30:
+        raise HTTPException(422, "At most 30 comments at a time")
+    _update(deck_id, approved=None)
+    _start(deck_id, body.template, comments=comments)
+    return _view(deck_id)
+
+
+@router.post("/decks/{deck_id}/approve")
+def approve_deck(deck_id: str):
+    """The user is happy with the deck: it is final (and stays so when another design is generated)."""
+    job = _get(deck_id)
+    if job["status"] == "running":
+        raise HTTPException(409, "The deck is being generated")
+    if not (_dir(deck_id) / deck_file(job["template"])).exists():
+        raise HTTPException(409, "There is no deck to approve yet")
+    _update(deck_id, status="done", approved=_story_hash(deck_id), approved_at=_now())
+    _log(deck_id, "Deck approved")
+    return _view(deck_id)
+
+
+@router.get("/decks/{deck_id}/preview/{template}/{file}")
+def preview_picture(deck_id: str, template: str, file: str):
+    _get(deck_id)
+    _check_template(template)
+    path = _dir(deck_id) / "preview" / template / file
+    if not re.fullmatch(r"\d{2}(\.thumb\.jpg|\.png)", file) or not path.exists():
+        raise HTTPException(404, "No such slide picture")
+    return FileResponse(path, headers={"Cache-Control": "no-cache"})
 
 
 @router.get("/decks/{deck_id}/pages/{file}")

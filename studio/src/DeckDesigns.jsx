@@ -111,6 +111,7 @@ export function useDeckFinishToast(status) {
   const [last, setLast] = useState(status);
   useEffect(() => {
     if (last === "running" && status === "done") toast("Your pitch deck is ready");
+    if (last === "running" && status === "review") toast("Your deck is ready to review");
     if (last === "running" && status === "failed") toast("The deck could not be generated", "error");
     setLast(status);
   }, [status]); // eslint-disable-line react-hooks/exhaustive-deps

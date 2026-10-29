@@ -466,3 +466,118 @@ def _check_requests(requests, slides: list[dict], dropped_charts: int) -> list[d
                                 "The deck came out differently - try rewording the request")
         out.append(item)
     return out
+
+
+# ── revising a deck after a review ───────────────────────────────────────────
+
+REVISE = """You edit a pitch deck after a review. You get the deck's current story ("deck": its title slide fields and
+its "slides", each numbered "n"), the material it was written from ("sections" and/or "app_tour"), and the reviewer's
+comments ("comments": each has an "id", a "target" - "slides[N]" (the slide with "n": N, whose current "headline" is
+given too), "title slide", "agenda" (the agenda lists the slides' kickers) or "deck" (the whole deck) - and the
+"comment").
+
+Do NOT rewrite the deck. Return only the edits the comments need, as one JSON object:
+{"edits": [   (every edit has "for": the id of the comment it answers)
+   {"do": "update", "target": "slides[N]", "headline": the slide's current title (or text) word for word,
+     "set": {only the fields that change, e.g. {"title": "..."} or {"points": [...]}}} - the usual edit,
+   {"do": "replace", "target": "slides[N]", "headline": its current title word for word, "slide": a complete slide of
+     another type} - only when the comment asks for a different kind of slide,
+   {"do": "insert_after", "target": "slides[N]", "slide": a complete new slide} (N = 0: insert at the start),
+   {"do": "delete", "target": "slides[N]", "headline": its current title word for word},
+   {"do": "title", "app_name": ..., "tagline": ..., "pitch": ...} (only the fields that change)
+ ],
+ "changes": [{"id": the comment's id, "status": "done" or "not_possible", "note": what you changed, or why not
+   (max 15 words)}] - one per comment}
+
+How:
+- A comment with a "slides[N]" target is about that slide only: edit that slide (the edit's "target" is the
+  comment's target). Never apply a comment to another slide. A slide's "title" or "headline" is its "title" field ("text" on a
+  statement or quote slide) - not its "kicker" (the small label above it). A comment on the whole deck (e.g. tone)
+  replaces every slide it affects. Anything you do not edit stays exactly as it is.
+- Replaced and new slides follow the deck's rules below: the slide types, their fields and word limits, and the
+  facts rule - only what the material states; the reviewer's comments count as material too (a figure or fact they
+  give may be used). Anything a deck of these slide types cannot do (animations, videos, logos, photos) is
+  "not_possible".
+
+The deck's rules (for the slides you write):
+
+"""
+
+
+def _key(v) -> str:
+    """A headline compared loosely: lower case, letters and digits only."""
+    return re.sub(r"[^a-z0-9]+", " ", str(v or "").lower()).strip()
+
+
+def revise_story(content: dict, comments: list[dict], parts: list[str], screens: list[dict] | None, title: str = "",
+                 log=print) -> tuple[dict, list[dict], dict]:
+    """One Azure OpenAI call for the edits the reviewer's comments need ([{"slide": n or None, "about": ...,
+    "comment": ...}]), applied here to the current story - so nothing the comments don't touch can change. Returns the
+    edited story (run normalize on it, with the comments' text as instructions), the model's report and the usage."""
+    deck = {k: content.get(k) for k in ("app_name", "tagline", "pitch")}
+    deck["slides"] = [{"n": i + 1, **{k: v for k, v in s.items() if k != "notes"}} for i, s in enumerate(content["slides"])]
+    prompt = REVISE + PROMPT.replace("[ICONS]", ", ".join(ICONS)).replace("[COUNT]", "the same number of")
+    asked = [{"id": i + 1, "target": c.get("about") or ("deck" if not c.get("slide") else "agenda"),
+              "comment": c["comment"]} for i, c in enumerate(comments)]
+    for a in asked:
+        m = re.fullmatch(r"slides\[(\d+)\]", a["target"])
+        if m and 1 <= int(m[1]) <= len(deck["slides"]):
+            sl = deck["slides"][int(m[1]) - 1]
+            a["headline"] = sl.get("title") or sl.get("text") or ""
+    payload = {"product_name": title or None, "deck": deck, "comments": asked, "sections": parts or None}
+    if screens:
+        payload["app_tour"] = screens
+    raw, usage = chat_json(prompt, payload, f"Revising the deck ({len(comments)} comment(s))", log, temperature=0.2)
+    log(f"Deck revised: {usage['input_tokens']:,} input + {usage['output_tokens']:,} output tokens "
+        f"(about ${usage['cost_usd']:.4f})")
+    story = {k: content.get(k) for k in ("audience", "core_message", "app_name", "tagline", "pitch")}
+    slides = [{"n": i + 1, **{k: v for k, v in s.items() if k != "notes"}} for i, s in enumerate(content["slides"])]
+    made = 0
+    for e in raw.get("edits") or []:
+        if not isinstance(e, dict):
+            continue
+        if e.get("do") == "title":
+            story.update({k: e[k] for k in ("app_name", "tagline", "pitch") if isinstance(e.get(k), str) and e[k].strip()})
+            made += 1
+            continue
+        target = str(e.get("target") or "")
+        answers = next((a for a in asked if a["id"] == e.get("for")), None)
+        if answers and answers["target"].startswith("slides[") and e.get("do") in ("update", "replace", "delete"):
+            target, e["headline"] = answers["target"], answers.get("headline") or e.get("headline")   # the comment's slide
+        m = re.fullmatch(r"\s*slides\[(\d+)\]\s*", target)
+        if not m:
+            continue
+        n = int(m[1])
+        at = next((k for k, s in enumerate(slides) if s.get("n") == n), None)
+        new = e.get("slide") if isinstance(e.get("slide"), dict) and e["slide"].get("type") in SLIDE_TYPES else None
+        quoted = _key(e.get("headline"))
+        if e.get("do") in ("update", "replace", "delete") and quoted:
+            # the model names the slide by its headline too: if the number points elsewhere, the headline wins;
+            # if neither matches, the edit is not applied (a wrong slide is never touched)
+            if at is None or _key(slides[at].get("title") or slides[at].get("text")) != quoted:
+                at = next((k for k, s in enumerate(slides) if _key(s.get("title") or s.get("text")) == quoted), None)
+                if at is None:
+                    continue
+        if e.get("do") == "update" and at is not None and isinstance(e.get("set"), dict):
+            slides[at] = {**slides[at], **{k: v for k, v in e["set"].items() if k not in ("n", "type")}}
+        elif e.get("do") == "replace" and at is not None and new:
+            slides[at] = {**new, "n": slides[at]["n"]}
+        elif e.get("do") == "delete" and at is not None:
+            del slides[at]
+        elif e.get("do") == "insert_after" and new and (at is not None or n == 0):
+            slides.insert(0 if n == 0 else at + 1, {**new, "n": None})
+        else:
+            continue
+        made += 1
+    story["slides"] = [{k: v for k, v in s.items() if k != "n"} for s in slides]
+    log(f"{made} edit(s) applied")
+    by_id = {c.get("id"): c for c in raw.get("changes") or [] if isinstance(c, dict)}
+    changes = []
+    for i, c in enumerate(comments):      # one line per comment, with the reviewer's own words and slide number
+        got = by_id.get(i + 1) or {}
+        changes.append({"comment": _text(c["comment"], 14), "slide": c.get("slide"),
+                        "status": got.get("status") if got.get("status") in ("done", "not_possible") else "not_possible",
+                        "note": _text(got.get("note"), 20) or ("" if got else "No change was made")})
+    if not made:      # nothing was actually changed: say so, whatever the model reported
+        changes = [{**c, "status": "not_possible", "note": c["note"] or "No change was made"} for c in changes]
+    return story, changes, usage

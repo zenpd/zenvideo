@@ -199,6 +199,16 @@ Open **Pitch decks** → **New deck** (or **Create pitch deck** on a finished vi
 the app's link; below, the narration - either one is enough, both make the strongest deck. Pick a design and click
 **Generate deck**. A deck from text takes about 15 seconds; with a link, about 1-2 minutes (the app is explored once).
 
+- **Review before it's final:** a new deck opens as a draft (**To review**) showing every slide as it will look - the
+  pictures are drawn from the .pptx itself (`ppt/preview.py`, no PowerPoint needed; line breaks can differ slightly).
+  Click a slide and add comments - "make this headline shorter", "turn this into a chart", "remove the slide about
+  …" - or comments for the whole deck ("a more formal tone"), then **Apply comments**: one AI call (about 10-20 s)
+  returns only the edits those comments need, applied in code to exactly the slides they are about (a slide is named
+  by its headline as well as its number, so a mistaken edit is refused rather than applied elsewhere), with the same
+  fact checks as a new deck - a figure you give in a comment may be used. The deck is rebuilt and shown again; each
+  round's comments and what was done with them are listed. Repeat as needed, then **Approve deck** to make it final.
+  Switching design keeps an approved deck approved.
+
 - **Input:** a video narration, a call or meeting transcript (speaker names, timestamps, SRT/VTT subtitles and filler
   words are cleaned out), or notes. Stage directions such as `Click "Approve"` are ignored.
 - **Deck brief:** choose who it's for (Auto, Executives, Investors, Customers, Technical team, Internal team), the length

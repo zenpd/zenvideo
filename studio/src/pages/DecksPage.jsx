@@ -6,9 +6,11 @@ import { host, relativeTime } from "../format.js";
 import { navigate, query } from "../router.js";
 import { BriefPicker, DEFAULT_BRIEF, DeckBar, DesignGrid, RequestReport, useDeckFinishToast, useDeckTemplates } from "../DeckDesigns.jsx";
 import { Alert, ConfirmDialog, Empty, Field, PageHead, PanelHead, Spinner, Switch, useToast } from "../ui.jsx";
+import DeckReview from "../DeckReview.jsx";
 
 const STATE = {
   running: ["b-violet", "Generating"],
+  review: ["b-yellow", "To review"],
   done: ["b-green", "Ready"],
   failed: ["b-red", "Failed"],
 };
@@ -305,6 +307,10 @@ export function LinkDeckPage({ id }) {
       />
 
       <div className="stack">
+        {templates && deck.preview?.length > 0 && (
+          <DeckReview deck={deck} running={running} onChanged={refresh}
+            names={Object.fromEntries(templates.map((t) => [t.id, t.name]))} />
+        )}
         {deck.narration && (
           <details className="disclosure panel rise">
             <summary><Icon name="chevronRight" size={16} />Narration · {deck.narration.trim().split(/\s+/).length} words</summary>
