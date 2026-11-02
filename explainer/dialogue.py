@@ -18,25 +18,23 @@ import re
 from explainer.planner import WPM, _cue, _said, _text, sentences
 from ppt.writer import StoryError, _numbers_in, _scrub, _stated, _vocab, chat_json
 
-# id -> look (drawn by explainer/web/office.js) and default voice
+# id -> look (drawn by explainer/web/office.js) and default voice: British office people in business dress, with
+# British voices. outfit: blazer (jacket top2 over shirt top, a tie if given), knit (V-neck over a shirt) or blouse.
 CAST = {
-    "maya":   {"name": "Maya", "voice": "af_sarah", "skin": "#8d5a3b", "hair": "#1f1410", "hair_style": "curly",
-               "top": "#0f766e", "top2": "#115e59", "glasses": False, "beard": False, "lips": "#6b3a2a",
-               "eyes": "#4a2c1d", "lashes": True},
-    "sam":    {"name": "Sam", "voice": "am_michael", "skin": "#f1c7a5", "hair": "#5b3a22", "hair_style": "short",
-               "top": "#1e3a8a", "top2": "#1e40af", "glasses": True, "beard": False, "lips": "#b06f5a", "eyes": "#3f6e9a"},
-    "priya":  {"name": "Priya", "voice": "bf_emma", "skin": "#b57a52", "hair": "#120c0a", "hair_style": "long",
-               "top": "#b45309", "top2": "#92400e", "glasses": False, "beard": False, "lips": "#7a3f2d",
-               "eyes": "#3b2416", "lashes": True},
-    "daniel": {"name": "Daniel", "voice": "bm_george", "skin": "#5c3a26", "hair": "#0d0806", "hair_style": "buzz",
-               "top": "#e5e7eb", "top2": "#475569", "glasses": False, "beard": True, "lips": "#4a2a1e", "eyes": "#3b2416"},
-    "elena":  {"name": "Elena", "voice": "af_nicole", "skin": "#f5d0b5", "hair": "#d9a441", "hair_style": "bob",
-               "top": "#e11d48", "top2": "#be123c", "glasses": False, "beard": False, "lips": "#c06a5a",
-               "eyes": "#4f7f5a", "lashes": True},
-    "kenji":  {"name": "Kenji", "voice": "am_adam", "skin": "#e8b98f", "hair": "#141018", "hair_style": "side",
-               "top": "#166534", "top2": "#14532d", "glasses": True, "beard": False, "lips": "#a3604c", "eyes": "#3b2416"},
+    "emily":     {"name": "Emily", "voice": "bf_emma", "skin": "#f5d5c0", "hair": "#5a3a24", "hair_style": "long",
+                  "outfit": "blazer", "top": "#f4f6f9", "top2": "#1f3b5c", "glasses": False, "beard": False,
+                  "lips": "#c0676b", "eyes": "#4a78a8", "lashes": True},
+    "oliver":    {"name": "Oliver", "voice": "bm_george", "skin": "#f1cbb0", "hair": "#3a281c", "hair_style": "short",
+                  "outfit": "blazer", "top": "#eef2f7", "top2": "#2f3640", "tie": "#0e7c86", "glasses": False,
+                  "beard": False, "lips": "#b97a6a", "eyes": "#4f6d8a"},
+    "charlotte": {"name": "Charlotte", "voice": "bf_isabella", "skin": "#f7dccc", "hair": "#c9a063", "hair_style": "bob",
+                  "outfit": "blouse", "top": "#7d2a3c", "top2": "#5e1f2d", "glasses": False, "beard": False,
+                  "lips": "#c46a6e", "eyes": "#5b7f5a", "lashes": True},
+    "harry":     {"name": "Harry", "voice": "bm_lewis", "skin": "#efc6a8", "hair": "#7a4528", "hair_style": "side",
+                  "outfit": "knit", "top": "#24395c", "top2": "#1b2c47", "glasses": True, "beard": False,
+                  "lips": "#b8786a", "eyes": "#5a6f86"},
 }
-DEFAULT_CAST = ("maya", "sam")
+DEFAULT_CAST = ("emily", "oliver")
 # the presenters' studio people (explainer/web/stage.js): full-body, in business dress; British voices by default
 STUDIO_CAST = {
     "sophie": {"name": "Sophie", "voice": "bf_emma", "body": "f", "skin": "#f1c6a6", "hair": "#5a3825",
@@ -53,17 +51,16 @@ STUDIO_CAST = {
               "tie": "#7c2d12", "trousers": "#1c2f45", "shoes": "#1b1b1b", "pocket": "#f4f6f9", "stubble": True},
 }
 DEFAULT_STUDIO = ("sophie", "james")
-FORMATS = ("conversation", "presenters", "conversation3d")
+FORMATS = ("conversation", "presenters")
 
 
 def presets_for(fmt: str) -> tuple[dict, tuple[str, str]]:
     """The people a format can cast, and its default pair."""
     if fmt == "presenters":
         return STUDIO_CAST, DEFAULT_STUDIO
-    if fmt == "conversation3d":          # realistic 3D office people (Microsoft Rocketbox), explainer.office3d
-        from explainer.office3d import AVATARS, DEFAULT_3D
-        return AVATARS, DEFAULT_3D
     return CAST, DEFAULT_CAST
+
+
 GESTURES = ("explain", "point", "open", "count", "think", "wave", "none")
 MOODS = ("neutral", "happy", "curious", "concerned", "excited")
 

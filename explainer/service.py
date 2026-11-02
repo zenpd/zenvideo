@@ -28,8 +28,8 @@ from explainer.planner import MODES, estimate_seconds, fit_scenes, plan_scenes
 from explainer.voice import narrate, narrate_dialogue
 
 PLAN_VERSION = 2
-STYLES = ("explainer", "conversation", "presenters", "hitech", "conversation3d")   # hitech, 3D: by HyperFrames
-TALK = ("conversation", "presenters", "conversation3d")
+STYLES = ("explainer", "conversation", "presenters", "hitech")   # hitech: rendered by HyperFrames
+TALK = ("conversation", "presenters")
 MAX_SPEED = 1.12        # a script that comes out longer than asked is spoken a little faster, up to this
 
 
@@ -171,12 +171,6 @@ def generate(work_dir: Path, narration: str, title: str = "", theme: str = "midn
             faster = min(MAX_SPEED, round(speed * timeline["duration"] / target_seconds + 0.01, 2))
             log(f"{timeline['duration']:.0f}s is over the {target_seconds}s asked for - speaking at {faster}x")
             timeline = narrate(plan, work_dir, voice, faster, log)
-    if style == "conversation3d":
-        from explainer import office3d
-        out = office3d.render(work_dir, timeline, log, progress, captions, music, avatars=cast,
-                              logo=work_dir / "logo.png" if (work_dir / "logo.png").exists() else None,
-                              brand=timeline.get("brand"), brand_name=brand_name)
-        return out, usage
     if style == "hitech":
         from explainer import hitech
         saved_logo = work_dir / "logo.png"

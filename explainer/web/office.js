@@ -140,17 +140,24 @@
   }
 
   // ── the people ─────────────────────────────────────────────────────────────
-  // Drawn facing +x (towards the other person) in a 600x700 box; the person on the right is mirrored.
+  // Seated at the desk in a three-quarter view, turned towards the other person: drawn facing +x in a 600x700 box (the
+  // person on the right is mirrored), lit from the window side (-x). Head x 226-378, y 194-394; shoulders at y 462.
+  // Hair: back (behind the body, for long hair), front (over the head), lock (a strand falling in front of the near ear).
   const HAIR = {
-    short: { front: "M200,272 C194,188 246,148 306,150 C364,152 406,190 400,262 C392,232 372,214 342,204 C302,226 250,226 220,214 C208,232 203,250 200,272 Z" },
-    buzz: { front: "M206,252 C206,188 250,160 300,160 C352,160 394,188 394,252 C382,222 350,204 300,204 C250,204 220,222 206,252 Z", opacity: 0.88 },
-    side: { front: "M198,282 C188,190 246,146 312,148 C372,150 412,196 402,272 C396,240 386,222 362,210 C330,232 268,220 238,194 C222,214 206,242 198,282 Z" },
-    long: { back: "M188,282 C182,168 248,138 300,138 C352,138 418,168 412,282 L428,566 C382,592 218,592 172,566 Z",
-            front: "M200,286 C194,194 246,156 300,156 C356,156 406,194 400,286 C392,240 360,204 300,198 C240,204 208,240 200,286 Z" },
-    bob: { back: "M186,282 C182,172 246,142 300,142 C356,142 418,172 414,282 L416,404 C382,424 218,424 184,404 Z",
-           front: "M200,276 C198,188 250,158 300,158 C356,158 402,188 400,276 C396,242 382,224 362,224 C322,232 260,230 232,222 C214,236 204,252 200,276 Z" },
+    short: { front: "M226,276 C218,214 256,182 306,182 C354,182 386,212 382,264 C376,246 366,234 352,228 C324,238 284,236 256,226 C244,240 236,256 232,280 Z" },
+    side: { front: "M224,278 C214,208 262,176 314,178 C362,180 392,214 384,268 C376,238 354,222 324,220 C300,232 266,234 244,222 C234,240 230,258 228,280 Z" },
+    buzz: { front: "M232,262 C232,214 264,190 306,190 C350,190 378,214 378,258 C368,236 342,224 306,224 C270,224 246,236 232,262 Z", opacity: 0.9 },
+    long: { back: "M214,262 C208,196 254,174 306,176 C360,178 396,212 394,268 L408,500 C390,532 340,540 306,536 L230,530 C210,500 208,460 212,400 Z",
+            front: "M224,290 C216,214 258,180 308,180 C358,180 390,214 386,272 C372,242 348,224 316,218 C292,230 262,244 244,268 C236,278 230,286 224,290 Z",
+            lock: "M230,262 C218,300 216,380 224,448 C228,466 238,470 242,458 C234,410 232,330 240,270 Z" },
+    bob: { back: "M216,262 C210,198 256,176 306,176 C360,176 394,210 390,264 L394,392 C372,410 334,410 318,404 L238,404 C220,392 212,340 216,262 Z",
+           front: "M224,300 C214,214 258,180 306,180 C356,180 390,214 386,276 C380,250 366,232 346,224 C318,234 274,234 248,226 C236,246 230,272 230,300 Z",
+           lock: "M230,272 C222,320 224,372 236,404 L248,404 C240,362 238,312 242,272 Z" },
     curly: { curls: true },
   };
+  // the head sits a little lower and larger than drawn; it turns about the neck (304, 418)
+  const HEAD_SET = "translate(304 418) scale(1.06) translate(-304 -400)";
+  const HAIR_FIT = "matrix(0.81 0 0 0.853 61 47.3)";     // the curls were drawn for a bigger head (x 205-395, y 172-404)
   const ARM = { upper: 145, fore: 112 };
   // poses: [upper arm angle, forearm angle] per arm (left, right), in degrees; 0 = hanging down, + = clockwise
   const REST = [[8, -78], [-8, 78]];
@@ -163,97 +170,173 @@
     wave: [null, [-150, -176]],
     none: [null, null],
   };
+  const SHIRT = "#f4f6f9";
+
+  // what they wear: a blazer over a shirt (and a tie), a V-neck knit over a collared shirt, or a blouse
+  function outfitOf(p, light) {
+    if (p.outfit) return p.outfit;
+    return light ? "blazer" : p.lashes ? "blouse" : "knit";
+  }
 
   function person(p, i, bodyLayer, armLayer) {
     const place = i === 0 ? "translate(170,140)" : "translate(1750,140) scale(-1,1)";
     const body = S("g", { transform: place }, bodyLayer);
     const front = S("g", { transform: place }, armLayer);
-    const skinD = shade(p.skin, 0.86);
+    const skinD = shade(p.skin, 0.88), skinS = shade(p.skin, 0.74);
     const light = (() => { const n = parseInt(p.top.slice(1), 16); return ((n >> 16) + ((n >> 8) & 255) + (n & 255)) / 765 > 0.8; })();
-    S("rect", { x: 132, y: 352, width: 336, height: 440, rx: 64, fill: "var(--chair)" }, body);
-    const torsoG = S("g", {}, body);
-    const torso = light ? p.top2 : p.top;
-    S("path", { d: "M148,740 L156,540 C160,470 204,448 246,444 L354,444 C396,448 440,470 444,540 L452,740 Z", fill: torso }, torsoG);
-    if (light) {      // a light shirt under a jacket
-      S("path", { d: "M252,444 L348,444 L330,740 L270,740 Z", fill: p.top }, torsoG);
-      S("path", { d: "M252,444 L300,520 L276,740 L246,740 Z", fill: shade(p.top2, 0.85) }, torsoG);
-      S("path", { d: "M348,444 L300,520 L324,740 L354,740 Z", fill: shade(p.top2, 0.85) }, torsoG);
-    } else {
-      S("path", { d: "M262,444 L338,444 L300,500 Z", fill: skinD }, torsoG);
-      S("path", { d: "M252,444 L300,506 L348,444", fill: "none", stroke: shade(p.top, 0.8), "stroke-width": 8, "stroke-linejoin": "round" }, torsoG);
-    }
-    S("path", { d: "M272,368 L328,368 L330,450 C316,464 284,464 270,450 Z", fill: skinD }, torsoG);
+    const outfit = outfitOf(p, light);
+    const cloth = outfit === "blazer" ? (light ? p.top2 : p.top) : p.top;      // the jacket, knit or blouse
+    const shirt = outfit === "blazer" ? (light ? p.top : SHIRT) : SHIRT;
 
-    const head = S("g", {}, torsoG);
+    // the chair's back behind them
+    S("rect", { x: 132, y: 372, width: 336, height: 460, rx: 70, fill: "var(--chair)" }, body);
+    S("rect", { x: 150, y: 388, width: 300, height: 26, rx: 13, fill: "#fff", opacity: 0.06 }, body);
+    const torsoG = S("g", {}, body);
+
+    // long hair falls behind the shoulders
     const hair = HAIR[p.hair_style] || HAIR.short;
-    if (hair.back) S("path", { d: hair.back, fill: p.hair }, head);
+    const headBack = S("g", {}, torsoG);
+    if (hair.back) S("path", { d: hair.back, fill: shade(p.hair, 0.82) }, S("g", { transform: HEAD_SET }, headBack));
+    // neck, with the jaw's shadow on it
+    S("path", { d: "M274,350 L336,350 L340,474 C322,488 290,488 270,474 Z", fill: skinD }, torsoG);
+    S("path", { d: "M274,380 C292,412 324,414 338,384 L340,418 C322,434 290,434 272,418 Z", fill: skinS, opacity: 0.5 }, torsoG);
+
+    // the body: shoulders and chest, shaded on the far side, then the neckline of what they wear
+    S("path", { d: "M144,812 L150,570 C152,514 180,486 226,474 L274,462 L338,462 L386,474 C430,486 454,514 454,570 L460,812 Z", fill: cloth }, torsoG);
+    S("path", { d: "M404,478 C438,492 454,520 454,570 L460,812 L414,812 C420,700 424,580 404,478 Z", fill: shade(cloth, 0.82) }, torsoG);
+    S("path", { d: "M196,520 C204,600 206,700 200,812", fill: "none", stroke: shade(cloth, 0.86), "stroke-width": 4, "stroke-linecap": "round" }, torsoG);
+    if (outfit === "blazer") {
+      S("path", { d: "M262,462 L346,462 L324,812 L286,812 Z", fill: shirt }, torsoG);
+      if (p.tie) {
+        S("path", { d: "M296,500 L314,500 L318,520 L310,640 L305,654 L300,640 L292,520 Z", fill: p.tie }, torsoG);
+        S("path", { d: "M296,500 L314,500 L310,516 L300,516 Z", fill: shade(p.tie, 0.8) }, torsoG);
+      }
+      S("path", { d: "M270,458 L304,500 L290,520 L258,470 Z", fill: shade(shirt, 0.9) }, torsoG);   // collar
+      S("path", { d: "M340,458 L304,500 L318,520 L352,470 Z", fill: shade(shirt, 0.86) }, torsoG);
+      S("path", { d: "M256,466 L226,480 L270,580 L304,690 L294,580 Z", fill: shade(cloth, 0.86) }, torsoG);   // lapels
+      S("path", { d: "M352,466 L384,480 L338,580 L304,690 L316,580 Z", fill: shade(cloth, 0.74) }, torsoG);
+      S("path", { d: "M262,462 L304,690 L346,462", fill: "none", stroke: shade(cloth, 0.6), "stroke-width": 2.5, "stroke-linejoin": "round" }, torsoG);
+      S("circle", { cx: 304, cy: 728, r: 6, fill: shade(cloth, 0.6) }, torsoG);
+      S("path", { d: "M352,600 L392,596", stroke: shade(cloth, 0.7), "stroke-width": 3, "stroke-linecap": "round" }, torsoG);   // breast pocket
+    } else if (outfit === "knit") {
+      S("path", { d: "M266,462 L344,462 L305,556 Z", fill: shirt }, torsoG);
+      S("path", { d: "M276,458 L305,494 L292,510 L262,468 Z", fill: shade(shirt, 0.9) }, torsoG);   // collar points
+      S("path", { d: "M334,458 L305,494 L318,510 L348,468 Z", fill: shade(shirt, 0.86) }, torsoG);
+      S("path", { d: "M262,462 L305,562 L348,462", fill: "none", stroke: shade(cloth, 0.78), "stroke-width": 10, "stroke-linejoin": "round" }, torsoG);
+    } else {
+      S("path", { d: "M262,462 C268,520 342,520 348,462 Z", fill: skinD }, torsoG);
+      S("path", { d: "M262,462 C268,520 342,520 348,462", fill: "none", stroke: shade(cloth, 0.8), "stroke-width": 6 }, torsoG);
+      S("path", { d: "M272,470 C282,508 328,508 338,470", fill: "none", stroke: "#d4af37", "stroke-width": 2.2 }, torsoG);   // a fine necklace
+      S("circle", { cx: 305, cy: 500, r: 4, fill: "#e8c55a" }, torsoG);
+    }
+
+    // the head: turned three-quarters towards the other person, the near ear showing, the far cheek in shade
+    const headTurn = S("g", {}, torsoG);
+    const head = S("g", { transform: HEAD_SET }, headTurn);
+    const hairG = S("g", { transform: HAIR_FIT }, head);
     if (hair.curls) for (let k = 0; k < 15; k++) {
       const a = Math.PI * (0.92 + k * 1.16 / 14);
-      S("circle", { cx: 300 + Math.cos(a) * 118, cy: 282 + Math.sin(a) * 128, r: 50 + rand(k) * 10, fill: p.hair }, head);
+      S("circle", { cx: 300 + Math.cos(a) * 118, cy: 282 + Math.sin(a) * 128, r: 50 + rand(k) * 10, fill: shade(p.hair, 0.9) }, hairG);
     }
-    S("ellipse", { cx: 207, cy: 300, rx: 16, ry: 24, fill: skinD }, head);
-    S("ellipse", { cx: 393, cy: 300, rx: 16, ry: 24, fill: skinD }, head);
-    S("path", { d: "M205,282 C205,200 250,172 300,172 C350,172 395,200 395,282 C395,352 360,404 300,404 C240,404 205,352 205,282 Z", fill: p.skin }, head);
-    const face = S("g", { transform: "translate(9,0)" }, head);     // features turned a little towards the other person
-    S("ellipse", { cx: 246, cy: 338, rx: 19, ry: 10, fill: "#ff5c5c", opacity: 0.13 }, face);
-    S("ellipse", { cx: 354, cy: 338, rx: 19, ry: 10, fill: "#ff5c5c", opacity: 0.13 }, face);
-    if (p.beard) S("path", { d: "M214,318 C218,392 258,418 300,418 C342,418 382,392 386,318 C372,362 342,376 300,376 C258,376 228,362 214,318 Z",
-      fill: p.hair, opacity: 0.92 }, face);
-    const eyes = [262, 338].map((ex) => {
-      const g = S("g", {}, face);
-      S("ellipse", { cx: ex, cy: 292, rx: 16, ry: 17.5, fill: "#fff" }, g);
-      const pupil = S("g", {}, g);
-      S("circle", { cx: ex, cy: 294, r: 10, fill: p.eyes || "#5b3a29" }, pupil);
-      S("circle", { cx: ex, cy: 294, r: 10, fill: "none", stroke: shade(p.eyes || "#5b3a29", 0.6), "stroke-width": 1.6 }, pupil);
-      S("circle", { cx: ex, cy: 294, r: 5, fill: "#16121a" }, pupil);
-      S("circle", { cx: ex + 3.5, cy: 290, r: 3, fill: "#fff" }, pupil);
-      S("path", { d: `M${ex - 17},290 C${ex - 12},272 ${ex + 12},272 ${ex + 17},290`, fill: "none", stroke: "#2a1a18",
-        "stroke-width": p.lashes ? 4.6 : 3.4, "stroke-linecap": "round" }, g);
-      if (p.lashes) [[13, -6], [17, -1]].forEach(([dx, dy]) => S("path", { d: `M${ex + dx},${284 + dy} l7,-6`, stroke: "#2a1a18",
-        "stroke-width": 3, "stroke-linecap": "round" }, g));
-      return { g, pupil, ex };
+    S("path", { d: "M234,272 C214,264 206,290 212,308 C216,322 228,326 238,318 Z", fill: skinD }, head);       // ear
+    S("path", { d: "M230,282 C220,282 218,298 224,306", fill: "none", stroke: skinS, "stroke-width": 3, "stroke-linecap": "round" }, head);
+    S("path", { d: "M228,282 C226,228 260,194 304,194 C352,194 380,228 378,282 C377,318 368,346 352,366 C338,384 322,394 306,394 C286,394 264,384 250,366 C236,348 229,318 228,282 Z", fill: p.skin }, head);
+    S("path", { d: "M378,282 C377,318 368,346 352,366 C338,384 322,394 306,394 C332,380 354,350 362,312 C366,290 368,266 364,238 C374,252 378,266 378,282 Z", fill: skinD }, head);
+    S("ellipse", { cx: 272, cy: 332, rx: 15, ry: 8, fill: "#ff5c5c", opacity: 0.07 }, head);
+    S("ellipse", { cx: 346, cy: 332, rx: 12, ry: 7, fill: "#ff5c5c", opacity: 0.06 }, head);
+    if (p.beard) S("path", { d: "M236,314 C240,370 272,398 306,398 C342,398 368,370 376,314 C366,348 344,362 308,364 C274,364 248,350 236,314 Z",
+      fill: p.hair, opacity: 0.9 }, head);
+
+    // eyes: almond whites, an iris that looks around, upper lids (and lashes), a crease above
+    const eyes = [[274, 1], [336, 0.88]].map(([ex, wk], k) => {
+      const ey = 288;
+      const g = S("g", {}, head);
+      const wrap = S("g", { transform: `translate(${ex} ${ey}) scale(${wk} 1) translate(${-ex} ${-ey})` }, g);
+      const almond = `M${ex - 15},${ey} C${ex - 8},${ey - 14} ${ex + 8},${ey - 14} ${ex + 15},${ey - 1} C${ex + 8},${ey + 8} ${ex - 8},${ey + 8} ${ex - 15},${ey} Z`;
+      const clip = S("clipPath", { id: `eye${i}${k}` }, S("defs", {}, wrap));
+      S("path", { d: almond }, clip);
+      S("path", { d: almond, fill: "#fbfaf7" }, wrap);
+      const inner = S("g", { "clip-path": `url(#eye${i}${k})` }, wrap);
+      const pupil = S("g", {}, inner);
+      const iris = p.eyes || "#5b3a29";
+      S("circle", { cx: ex + 2, cy: ey - 2, r: 7, fill: iris }, pupil);
+      S("circle", { cx: ex + 2, cy: ey - 2, r: 7, fill: "none", stroke: shade(iris, 0.55), "stroke-width": 1.3 }, pupil);
+      S("circle", { cx: ex + 2, cy: ey - 2, r: 3.3, fill: "#120e12" }, pupil);
+      S("circle", { cx: ex + 4.5, cy: ey - 5, r: 1.9, fill: "#fff" }, pupil);
+      S("path", { d: `M${ex - 15},${ey - 8} C${ex - 6},${ey - 17} ${ex + 8},${ey - 17} ${ex + 15},${ey - 7} L${ex + 15},${ey - 1} C${ex + 8},${ey - 14} ${ex - 8},${ey - 14} ${ex - 15},${ey} Z`,
+        fill: skinS, opacity: 0.18 }, inner);   // the lid's shadow on the eye
+      S("path", { d: `M${ex - 16},${ey + 1} C${ex - 9},${ey - 15} ${ex + 9},${ey - 15} ${ex + 16},${ey - 1}`, fill: "none", stroke: "#2a1a18",
+        "stroke-width": p.lashes ? 3.6 : 2.8, "stroke-linecap": "round" }, wrap);
+      if (p.lashes) S("path", { d: k === 0 ? `M${ex - 15},${ey} l-4,-3` : `M${ex + 15},${ey - 2} l4,-3`, stroke: "#2a1a18", "stroke-width": 2.4,
+        "stroke-linecap": "round" }, wrap);
+      S("path", { d: `M${ex - 13},${ey - 15} C${ex - 5},${ey - 21} ${ex + 7},${ey - 21} ${ex + 14},${ey - 14}`, fill: "none", stroke: skinS,
+        "stroke-width": 1.4, opacity: 0.35, "stroke-linecap": "round" }, g);   // crease
+      return { g, pupil, ex, ey, k: 0.5 };
     });
-    const brows = [262, 338].map((ex) => S("path", { d: `M${ex - 20},257 C${ex - 10},246 ${ex + 8},245 ${ex + 21},252 L${ex + 21},256 C${ex + 8},251 ${ex - 10},252 ${ex - 20},261 Z`,
-      fill: shade(p.hair, 0.9), stroke: shade(p.hair, 0.9), "stroke-width": 2.5, "stroke-linejoin": "round" }, face));
-    S("path", { d: "M302,300 Q292,330 306,338", fill: "none", stroke: shade(p.skin, 0.72), "stroke-width": 5, "stroke-linecap": "round" }, face);
+    const brows = [[274, 1], [336, 0.88]].map(([ex, wk]) => {
+      const by = 262;
+      const b = S("path", { d: `M${ex - 18 * wk},${by + 5} C${ex - 8 * wk},${by - 4} ${ex + 8 * wk},${by - 6} ${ex + 19 * wk},${by - 1} L${ex + 19 * wk},${by + 3} C${ex + 8 * wk},${by - 1} ${ex - 8 * wk},${by + 1} ${ex - 18 * wk},${by + 8} Z`,
+        fill: shade(p.hair, 0.9), stroke: shade(p.hair, 0.9), "stroke-width": 1.5, "stroke-linejoin": "round" }, head);
+      b.ex = ex; b.ey = by;
+      return b;
+    });
+    // nose, in three-quarter view: the bridge and the tip turned towards the other person
+    S("path", { d: "M324,312 C328,322 332,328 331,333 C330,339 321,341 313,337", fill: "none", stroke: skinS, "stroke-width": 2.6,
+      "stroke-linecap": "round", "stroke-linejoin": "round" }, head);
+    S("ellipse", { cx: 320, cy: 343, rx: 10, ry: 2.6, fill: skinS, opacity: 0.25 }, head);
     // mouth shapes (see explainer.voice.VISEME)
-    const mouthG = S("g", { transform: "translate(304,368)" }, face);
+    const mouthG = S("g", { transform: "translate(318,362) scale(0.68)" }, head);
     const dark = "#3a1216", lip = p.lips;
     const shapes = {};
     const shape = (name, build) => { const g = S("g", { display: "none" }, mouthG); build(g); shapes[name] = g; };
     const teeth = (g, w, y, h = 6) => S("rect", { x: -w, y, width: 2 * w, height: h, rx: 2, fill: "#fff" }, g);
-    shape("X", (g) => S("path", { d: "M-24,-2 Q0,12 24,-2", fill: "none", stroke: lip, "stroke-width": 5.5, "stroke-linecap": "round" }, g));
-    shape("H", (g) => { S("path", { d: "M-28,-5 Q0,24 28,-5 Q0,4 -28,-5 Z", fill: dark }, g); S("path", { d: "M-24,-3 Q0,4 24,-3 L22,2 Q0,8 -22,2 Z", fill: "#fff" }, g); });
-    shape("M", (g) => S("path", { d: "M-22,2 Q0,5 22,2", fill: "none", stroke: lip, "stroke-width": 6.5, "stroke-linecap": "round" }, g));
-    shape("C", (g) => { S("ellipse", { rx: 17, ry: 7, fill: dark }, g); teeth(g, 12, -7, 5); });
-    shape("E", (g) => { S("ellipse", { rx: 23, ry: 11, fill: dark }, g); teeth(g, 17, -11, 6); });
-    shape("A", (g) => { S("ellipse", { rx: 20, ry: 19, fill: dark }, g); S("ellipse", { cy: 10, rx: 12, ry: 7, fill: "#e06b6b" }, g); teeth(g, 13, -19, 6); });
-    shape("O", (g) => { S("ellipse", { rx: 15, ry: 16, fill: dark }, g); S("ellipse", { rx: 15, ry: 16, fill: "none", stroke: lip, "stroke-width": 3 }, g); });
-    shape("U", (g) => { S("ellipse", { rx: 10, ry: 11, fill: dark }, g); S("ellipse", { rx: 10, ry: 11, fill: "none", stroke: lip, "stroke-width": 3.5 }, g); });
-    shape("F", (g) => { S("ellipse", { rx: 20, ry: 7, fill: dark }, g); teeth(g, 15, -7, 7); S("path", { d: "M-18,4 Q0,9 18,4", fill: "none", stroke: lip, "stroke-width": 4 }, g); });
+    shape("X", (g) => {
+      S("path", { d: "M-24,-2 Q0,10 24,-2", fill: "none", stroke: lip, "stroke-width": 6, "stroke-linecap": "round" }, g);
+      S("path", { d: "M-12,9 Q0,13 12,9", fill: "none", stroke: shade(p.skin, 0.8), "stroke-width": 3, "stroke-linecap": "round", opacity: 0.6 }, g);
+    });
+    shape("H", (g) => { S("path", { d: "M-28,-5 Q0,24 28,-5 Q0,4 -28,-5 Z", fill: dark }, g); S("path", { d: "M-24,-3 Q0,4 24,-3 L22,2 Q0,8 -22,2 Z", fill: "#fff" }, g);
+      S("path", { d: "M-28,-5 Q0,26 28,-5", fill: "none", stroke: lip, "stroke-width": 3.5, "stroke-linecap": "round" }, g); });
+    shape("M", (g) => S("path", { d: "M-22,2 Q0,6 22,2", fill: "none", stroke: lip, "stroke-width": 8, "stroke-linecap": "round" }, g));
+    shape("C", (g) => { S("ellipse", { rx: 17, ry: 7, fill: dark }, g); teeth(g, 12, -7, 5); S("ellipse", { rx: 18, ry: 8, fill: "none", stroke: lip, "stroke-width": 3 }, g); });
+    shape("E", (g) => { S("ellipse", { rx: 23, ry: 11, fill: dark }, g); teeth(g, 17, -11, 6); S("ellipse", { rx: 24, ry: 12, fill: "none", stroke: lip, "stroke-width": 3 }, g); });
+    shape("A", (g) => { S("ellipse", { rx: 20, ry: 19, fill: dark }, g); S("ellipse", { cy: 10, rx: 12, ry: 7, fill: "#e06b6b" }, g); teeth(g, 13, -19, 6);
+      S("ellipse", { rx: 21, ry: 20, fill: "none", stroke: lip, "stroke-width": 3.5 }, g); });
+    shape("O", (g) => { S("ellipse", { rx: 15, ry: 16, fill: dark }, g); S("ellipse", { rx: 15, ry: 16, fill: "none", stroke: lip, "stroke-width": 4 }, g); });
+    shape("U", (g) => { S("ellipse", { rx: 10, ry: 11, fill: dark }, g); S("ellipse", { rx: 10, ry: 11, fill: "none", stroke: lip, "stroke-width": 4.5 }, g); });
+    shape("F", (g) => { S("ellipse", { rx: 20, ry: 7, fill: dark }, g); teeth(g, 15, -7, 7); S("path", { d: "M-18,4 Q0,9 18,4", fill: "none", stroke: lip, "stroke-width": 5 }, g); });
     if (p.glasses) {
-      const gl = S("g", { fill: "rgba(255,255,255,.14)", stroke: "#1f2937", "stroke-width": 5 }, face);
-      S("rect", { x: 233, y: 268, width: 56, height: 46, rx: 15 }, gl);
-      S("rect", { x: 311, y: 268, width: 56, height: 46, rx: 15 }, gl);
-      S("path", { d: "M289,288 Q300,282 311,288", fill: "none" }, gl);
+      const gl = S("g", { fill: "rgba(255,255,255,.12)", stroke: "#1f2937", "stroke-width": 3.6 }, head);
+      S("rect", { x: 250, y: 272, width: 48, height: 34, rx: 11 }, gl);
+      S("rect", { x: 314, y: 272, width: 44, height: 34, rx: 11 }, gl);
+      S("path", { d: "M298,286 Q306,280 314,286", fill: "none" }, gl);
+      S("path", { d: "M250,284 L232,282", fill: "none" }, gl);
     }
-    if (hair.front) S("path", { d: hair.front, fill: p.hair, opacity: hair.opacity || 1 }, head);
-    if (hair.curls) for (let k = 0; k < 9; k++)
-      S("circle", { cx: 214 + k * 21.5, cy: 196 + Math.abs(k - 4) * 6 + rand(k + 30) * 8, r: 30 + rand(k + 7) * 8, fill: p.hair }, head);
+    if (hair.front) {
+      S("path", { d: hair.front, fill: p.hair, opacity: hair.opacity || 1 }, head);
+      if (hair.lock) S("path", { d: hair.lock, fill: shade(p.hair, 0.94) }, head);
+    }
+    if (hair.curls) {
+      const curls = S("g", { transform: HAIR_FIT }, head);
+      for (let k = 0; k < 9; k++)
+        S("circle", { cx: 214 + k * 21.5, cy: 196 + Math.abs(k - 4) * 6 + rand(k + 30) * 8, r: 30 + rand(k + 7) * 8, fill: p.hair }, curls);
+    }
 
-    // arms, in front of the desk
-    const arms = [[180, 486], [420, 486]].map(([sx, sy]) => {
+    // arms, in front of the desk: tapered sleeves with cuffs
+    const sleeve = shade(cloth, 0.96), cuff = outfit === "blouse" ? shade(cloth, 0.8) : shirt;
+    const arms = [[184, 500], [416, 500]].map(([sx, sy]) => {
       const upper = S("g", {}, front);
-      S("line", { x1: 0, y1: 0, x2: 0, y2: ARM.upper, stroke: shade(torso, 0.9), "stroke-width": 58, "stroke-linecap": "round" }, upper);
+      S("path", { d: `M-29,0 C-29,-22 29,-22 29,0 L24,${ARM.upper} C24,${ARM.upper + 20} -24,${ARM.upper + 20} -24,${ARM.upper} Z`, fill: sleeve }, upper);
+      S("path", { d: `M14,-12 C24,-8 29,-4 29,0 L24,${ARM.upper} C24,${ARM.upper + 12} 18,${ARM.upper + 18} 10,${ARM.upper + 19} Z`, fill: shade(cloth, 0.84) }, upper);
       const fore = S("g", {}, upper);
-      S("line", { x1: 0, y1: 0, x2: 0, y2: ARM.fore - 10, stroke: shade(torso, 0.9), "stroke-width": 52, "stroke-linecap": "round" }, fore);
-      S("line", { x1: 0, y1: ARM.fore - 22, x2: 0, y2: ARM.fore - 12, stroke: light ? p.top : shade(torso, 0.7), "stroke-width": 50, "stroke-linecap": "butt" }, fore);
+      S("path", { d: `M-25,0 C-25,-22 25,-22 25,0 L21,${ARM.fore - 16} L-21,${ARM.fore - 16} Z`, fill: sleeve }, fore);
+      S("path", { d: `M12,-16 C20,-10 25,-5 25,0 L21,${ARM.fore - 16} L10,${ARM.fore - 16} Z`, fill: shade(cloth, 0.84) }, fore);
+      S("rect", { x: -22, y: ARM.fore - 26, width: 44, height: 13, rx: 4, fill: cuff }, fore);
       // the thumb towards the body's middle: the arm on the right side gets a mirrored hand
-      const handG = S("g", { transform: `translate(0,${ARM.fore - 14}) scale(${sx > 300 ? -1.3 : 1.3} 1.3)` }, fore);
+      const handG = S("g", { transform: `translate(0,${ARM.fore - 14}) scale(${sx > 300 ? -1.2 : 1.2} 1.2)` }, fore);
       const hands = { relaxed: hand(handG, p.skin, "relaxed"), open: hand(handG, p.skin, "open") };
       return { upper, fore, sx, sy, hands };
     });
-    return { torsoG, head, eyes, brows, shapes, arms, mood: "neutral" };
+    return { torsoG, head: headTurn, headBack, eyes, brows, shapes, arms, mood: "neutral" };
   }
 
   function hand(parent, skin, pose) {
@@ -315,7 +398,8 @@
       tilt = 3 * smooth((t - cur.start) / 0.6) + cur.beats.reduce((s, b, k) => s + (cur.words.length > 8 && k % 3 === 1 ? 4.5 * Math.exp(-(((t - b - 0.25) / 0.2) ** 2)) : 0), 0);
     }
     const breathe = 2.4 * Math.sin(t * 1.5 + i * 2);
-    P.head.setAttribute("transform", `rotate(${tilt} 300 410)`);
+    P.head.setAttribute("transform", `rotate(${tilt} 304 418)`);
+    P.headBack.setAttribute("transform", `rotate(${tilt} 304 418)`);
     const lean = cur && t >= cur.start - 0.3 ? (cur.speaker === other ? 1.6 : 0.8) * smooth((t - cur.start + 0.3) / 0.8) : 0;
     P.torsoG.setAttribute("transform", `translate(0 ${breathe}) rotate(${lean} 300 760)`);
 
@@ -327,8 +411,8 @@
     const phase = (t + i * 1.3) % 3.7;
     const blink = phase > 3.55 ? 0.12 : rand(Math.floor((t + i * 1.3) / 3.7) + i * 50) > 0.7 && phase > 1.6 && phase < 1.75 ? 0.12 : 1;
     P.eyes.forEach((e) => {
-      e.g.setAttribute("transform", `translate(${e.ex} 292) scale(1 ${blink}) translate(${-e.ex} -292)`);
-      e.pupil.setAttribute("transform", `translate(${look[0]} ${look[1]})`);
+      e.g.setAttribute("transform", `translate(${e.ex} ${e.ey}) scale(1 ${blink}) translate(${-e.ex} ${-e.ey})`);
+      e.pupil.setAttribute("transform", `translate(${look[0] * e.k} ${look[1] * e.k})`);
     });
 
     // brows: raised for questions and curiosity, knitted for concern
@@ -338,7 +422,7 @@
     const lift = (mood === "curious" ? 7 : mood === "excited" || mood === "happy" ? 4 : 0) + ask * 6;
     P.brows.forEach((b, k) => {
       const knit = mood === "concerned" ? (k === 0 ? 8 : -8) : 0;
-      b.setAttribute("transform", `translate(0 ${-lift * (line ? smooth((t - line.start + 0.2) / 0.4) : 0)}) rotate(${knit} ${k ? 338 : 262} 252)`);
+      b.setAttribute("transform", `translate(0 ${-lift * 0.7 * (line ? smooth((t - line.start + 0.2) / 0.4) : 0)}) rotate(${knit * 0.7} ${b.ex} ${b.ey})`);
     });
 
     // mouth: the phoneme shapes while talking, a smile otherwise

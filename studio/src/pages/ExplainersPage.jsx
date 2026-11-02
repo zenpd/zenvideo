@@ -29,7 +29,7 @@ const SWATCH = {
 const LAYOUT_LABEL = { title: "Title", statement: "Statement", points: "Key points", stats: "Numbers", steps: "Steps",
   compare: "Before / after", chart: "Chart", icons: "Icon grid", quote: "Quote", closing: "Closing" };
 
-const STYLE_LABEL = { explainer: "Explainer", conversation: "Conversation", presenters: "Presenters", hitech: "Hi-tech", conversation3d: "3D conversation" };
+const STYLE_LABEL = { explainer: "Explainer", conversation: "Conversation", presenters: "Presenters", hitech: "Hi-tech" };
 
 const words = (t) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 
@@ -153,7 +153,7 @@ function StylePicker({ styles, value, onChange, disabled }) {
       {styles.map((s) => (
         <button key={s.id} type="button" role="radio" aria-checked={value === s.id} disabled={disabled} className="ex-style"
           onClick={() => onChange(s.id)}>
-          <Icon name={{ conversation: "user", presenters: "presentation", hitech: "wand", conversation3d: "user" }[s.id] || "sparkles"} size={22} />
+          <Icon name={{ conversation: "user", presenters: "presentation", hitech: "wand" }[s.id] || "sparkles"} size={22} />
           <span><strong>{s.label}</strong><span className="meta">{s.hint}</span></span>
         </button>
       ))}
@@ -163,7 +163,7 @@ function StylePicker({ styles, value, onChange, disabled }) {
 
 function CastPicker({ options, look, set, disabled }) {
   const studio = look.style === "presenters";
-  const people = studio ? options.studio_cast : look.style === "conversation3d" ? options.cast3d : options.cast;
+  const people = studio ? options.studio_cast : options.cast;
   const byId = Object.fromEntries(people.map((p) => [p.id, p]));
   const pick = (i, id) => {
     const cast = [...look.cast];
@@ -222,16 +222,15 @@ function LogoField({ logo, current, onChange, disabled }) {
 
 function LookFields({ options, look, set, disabled, showScript = true, logo, setLogo, currentLogo }) {
   const presenters = look.style === "presenters";
-  const talk = look.style === "conversation" || look.style === "conversation3d" || presenters;
+  const talk = look.style === "conversation" || presenters;
   const setStyle = (style) => set({ style, voices: ["", ""],
-    cast: style === "presenters" ? options.default_studio : style === "conversation" ? options.default_cast
-      : style === "conversation3d" ? options.default_3d : look.cast,
+    cast: style === "presenters" ? options.default_studio : style === "conversation" ? options.default_cast : look.cast,
     seconds: style === "presenters" && look.seconds > 90 ? 85 : look.seconds });
   return (
     <div className="stack" style={{ gap: 20 }}>
-      <Field label="Style">
+      {options.styles.length > 1 && <Field label="Style">
         <StylePicker styles={options.styles} value={look.style} onChange={setStyle} disabled={disabled} />
-      </Field>
+      </Field>}
       {talk && <Field label={presenters ? "The two presenters" : "The two people"}
         hint={presenters ? "They stand in a studio and present to camera, taking turns; a display between them shows the key points."
           : "They talk at a desk in an office; a wall screen between them shows the key points."}>
@@ -285,7 +284,7 @@ function LookFields({ options, look, set, disabled, showScript = true, logo, set
   );
 }
 
-const DEFAULT_LOOK = { style: "explainer", cast: ["maya", "sam"], voices: ["", ""], brand_name: "", theme: "midnight", voice: "af_sky", speed: 1,
+const DEFAULT_LOOK = { style: "conversation", cast: ["emily", "oliver"], voices: ["", ""], brand_name: "", theme: "midnight", voice: "af_sky", speed: 1,
   mode: "as_written", seconds: 120, captions: "soft", music: true };
 const LOOK_KEYS = Object.keys(DEFAULT_LOOK);
 const lookOf = (v) => Object.fromEntries(LOOK_KEYS.map((k) => [k, v[k] ?? DEFAULT_LOOK[k]]));
@@ -439,7 +438,7 @@ export function ExplainerPage({ id }) {
   const file = (name) => api.explainerFileUrl(video.id, name);
   const stage = video.stage ? video.stage : video.progress > 0 ? `Animating · ${Math.round(video.progress * 100)}%`
     : video.style === "conversation" ? "Writing the conversation and voicing it" : "Planning scenes and voicing them";
-  const isTalk = ["conversation", "presenters", "conversation3d"].includes(video.style);
+  const isTalk = ["conversation", "presenters"].includes(video.style);
 
   return (
     <>
