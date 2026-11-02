@@ -33,5 +33,9 @@ pyyaml
 numpy
 pillow
 python-pptx      # pitch deck output (deck.pptx)
+python-docx      # uploaded Word documents, and the Word report (report.docx)
+openpyxl         # uploaded Excel workbooks
+pdfplumber       # uploaded PDFs (text and tables)
+matplotlib       # the Word report's charts
 onnx
 faster-whisper   # optional fallback for word timing; exact timing comes from the Kokoro model via onnx

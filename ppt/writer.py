@@ -100,6 +100,28 @@ How to build a strong deck:
   anything you cannot do in a deck of these slide types (logos, photos, animations, ...) is "not_possible".
 - Return only the JSON object."""
 
+# Added to the prompt (deck and revision) only when the user uploaded documents (ppt.documents).
+DOCS = """- "documents" (when given) are files the user uploaded - reports, plans, proposals, spreadsheets, PDFs - as text
+  sections ({"ref", "text"}) and tables ({"table": id, "ref", "title", "rows": the header row, then one line per row,
+  cells separated by " | "}). They are material like "sections" and usually the main material: the deck presents what
+  they are about (a product, a programme, a plan, results, a proposal) to the brief's audience, persuasively and
+  accurately. When they are not about one product, "app_name" is the subject's short name (e.g. the programme's).
+- Tables hold the documents' real figures: stats, benefits metrics and charts may use their numbers written exactly as
+  the table gives them; a chart takes its categories and values from one table, in its order (e.g. a figure per
+  quarter: line). Never total, average, convert or round them yourself.
+- Every slide (closing included) gets "sources": the "ref" of each section or table its facts come from (1-3, copied
+  exactly), or [] when it states nothing specific.
+- Also return "gaps": [{"topic": what the brief's focus or the instructions ask for that the material does not cover
+  (max 8 words), "note": what the user could add to cover it (max 15 words)}] - [] when nothing is missing. Never
+  fill a gap with invented content.
+"""
+
+
+def with_docs(prompt: str) -> str:
+    """The deck prompt with the documents' rules (before its last line)."""
+    return prompt.replace("- Return only the JSON object.", DOCS + "- Return only the JSON object.")
+
+
 # Who the deck is for: id -> (label, one-line description for the UI, guidance for the model). "auto" lets the model
 # infer the audience from the material.
 AUDIENCES = {
@@ -148,10 +170,11 @@ def azure_config() -> dict | None:
 
 
 def write_story(parts: list[str], title: str = "", screens: list[dict] | None = None, log=print,
-                brief: dict | None = None) -> tuple[dict, dict]:
+                brief: dict | None = None, documents: list[dict] | None = None) -> tuple[dict, dict]:
     """One Azure OpenAI call: the raw story JSON (run normalize on it) and the call's token usage and estimated cost.
     parts: the narration's sections (may be empty when there are screens); screens: the app tour, [{"screen": id,
-    "via": how it was reached, "text": what it shows}]; brief: {"audience", "length", "focus"} (see AUDIENCES, LENGTHS)."""
+    "via": how it was reached, "text": what it shows}]; brief: {"audience", "length", "focus"} (see AUDIENCES, LENGTHS);
+    documents: uploaded files' sections and tables (ppt.documents.for_writer) - each slide then cites its "sources"."""
     brief = clean_brief(brief)
     _, lo, hi = LENGTHS[brief["length"]]
     payload = {"product_name": title or None,
@@ -162,7 +185,10 @@ def write_story(parts: list[str], title: str = "", screens: list[dict] | None = 
         payload["instructions"] = brief["instructions"]
     if screens:
         payload["app_tour"] = screens
+    if documents:
+        payload["documents"] = documents
     prompt = PROMPT.replace("[ICONS]", ", ".join(ICONS)).replace("[COUNT]", f"{lo}-{hi}")
+    prompt = with_docs(prompt) if documents else prompt
     content, usage = chat_json(prompt, payload, "Writing the deck's story", log, temperature=0.4)
     log(f"Story written: {usage['input_tokens']:,} input + {usage['output_tokens']:,} output tokens "
         f"(about ${usage['cost_usd']:.4f})")
@@ -310,7 +336,8 @@ def _scrub_all(v, numbers: set[float], vocab: set[str] | None = None, key: str =
     """_scrub on every string of the story, except stats values and metrics (checked whole, below) and the product
     name."""
     if isinstance(v, dict):
-        return {k: x if k in ("value", "values", "metric", "type", "icon", "screen", "app_name", "requests", "chart") else
+        return {k: x if k in ("value", "values", "metric", "type", "icon", "screen", "app_name", "requests", "chart",
+                              "sources", "gaps") else
                 _scrub_all(x, numbers, vocab, k) for k, x in v.items()}
     if isinstance(v, list):
         return [_scrub_all(x, numbers, vocab, key) for x in v]
@@ -323,13 +350,16 @@ def _text(v, limit: int = 0) -> str:
 
 
 def normalize(raw: dict, material: str, screen_ids: list[str] | None = None, title: str = "",
-              length: str = "standard", instructions: str = "", figures: str | None = None) -> dict:
+              length: str = "standard", instructions: str = "", figures: str | None = None,
+              refs: list[str] | None = None) -> dict:
     """Make the story safe to lay out: known slide types only, counts clamped, figures checked against the material
     (and the user's instructions, which may give a chart's numbers), icons and screens validated, a closing slide
     last, and each of the user's requests checked against the slides it produced.
     figures: the text whose numbers the deck may state, when not all of the material (an app's screens show demo data:
-    their numbers stay in the screenshots)."""
+    their numbers stay in the screenshots). refs: what a slide may cite as its "sources" (the uploaded documents'
+    sections and tables); others are dropped."""
     source = f"{material}\n{instructions}"
+    known = {_ref_key(r): r for r in refs or []}
     numbers = _numbers_in(f"{material if figures is None else figures}\n{instructions}")
     raw = _scrub_all(raw, numbers, _vocab(source, title, str(raw.get("app_name") or "")))
     dropped_charts = 0
@@ -409,6 +439,8 @@ def normalize(raw: dict, material: str, screen_ids: list[str] | None = None, tit
             out["items"] = items[:3]
         elif t == "closing":
             out.update(subtitle=_text(s.get("subtitle")), next_steps=[_text(x) for x in s.get("next_steps") or [] if _text(x)][:3])
+        if known:
+            out["sources"] = cite(s.get("sources"), known)
         slides.append(out)
     closing = next((x for x in slides if x["type"] == "closing"), None)
     slides = [x for x in slides if x["type"] != "closing"][:LENGTHS.get(length, LENGTHS["standard"])[2] - 1]
@@ -419,7 +451,33 @@ def normalize(raw: dict, material: str, screen_ids: list[str] | None = None, tit
     closing["subtitle"] = closing["subtitle"] or c["core_message"] or c["tagline"]
     c["slides"] = slides + [closing]
     c["requests"] = _check_requests(raw.get("requests"), c["slides"], dropped_charts)
+    if known:
+        c["gaps"] = gaps(raw.get("gaps"))
     return c
+
+
+def _ref_key(r) -> str:
+    return re.sub(r"\s+", " ", str(r or "")).strip().lower()
+
+
+def cite(sources, known: dict[str, str], most: int = 3) -> list[str]:
+    """The references a slide or section cites, as the documents name them: only known ones (a ref the model cut short
+    after its file or sheet still counts), each once."""
+    out = []
+    for x in sources if isinstance(sources, list) else []:
+        k = _ref_key(x)
+        ref = known.get(k) or next((v for kk, v in known.items() if k and kk.startswith(k + " >")), None)
+        if ref and ref not in out:
+            out.append(ref)
+    return out[:most]
+
+
+def gaps(raw) -> list[dict]:
+    """What the brief or instructions asked for that the material doesn't cover, as the model reported it."""
+    if not isinstance(raw, list):
+        return []
+    return [{"topic": _text(g.get("topic"), 10), "note": _text(g.get("note"), 20)} for g in raw
+            if isinstance(g, dict) and _text(g.get("topic"))][:5]
 
 
 def _number(v) -> float | None:
@@ -471,7 +529,7 @@ def _check_requests(requests, slides: list[dict], dropped_charts: int) -> list[d
 # ── revising a deck after a review ───────────────────────────────────────────
 
 REVISE = """You edit a pitch deck after a review. You get the deck's current story ("deck": its title slide fields and
-its "slides", each numbered "n"), the material it was written from ("sections" and/or "app_tour"), and the reviewer's
+its "slides", each numbered "n"), the material it was written from ("sections", "documents" and/or "app_tour"), and the reviewer's
 comments ("comments": each has an "id", a "target" - "slides[N]" (the slide with "n": N, whose current "headline" is
 given too), "title slide", "agenda" (the agenda lists the slides' kickers) or "deck" (the whole deck) - and the
 "comment").
@@ -510,13 +568,14 @@ def _key(v) -> str:
 
 
 def revise_story(content: dict, comments: list[dict], parts: list[str], screens: list[dict] | None, title: str = "",
-                 log=print) -> tuple[dict, list[dict], dict]:
+                 log=print, documents: list[dict] | None = None) -> tuple[dict, list[dict], dict]:
     """One Azure OpenAI call for the edits the reviewer's comments need ([{"slide": n or None, "about": ...,
     "comment": ...}]), applied here to the current story - so nothing the comments don't touch can change. Returns the
     edited story (run normalize on it, with the comments' text as instructions), the model's report and the usage."""
     deck = {k: content.get(k) for k in ("app_name", "tagline", "pitch")}
     deck["slides"] = [{"n": i + 1, **{k: v for k, v in s.items() if k != "notes"}} for i, s in enumerate(content["slides"])]
     prompt = REVISE + PROMPT.replace("[ICONS]", ", ".join(ICONS)).replace("[COUNT]", "the same number of")
+    prompt = with_docs(prompt) if documents else prompt
     asked = [{"id": i + 1, "target": c.get("about") or ("deck" if not c.get("slide") else "agenda"),
               "comment": c["comment"]} for i, c in enumerate(comments)]
     for a in asked:
@@ -527,6 +586,8 @@ def revise_story(content: dict, comments: list[dict], parts: list[str], screens:
     payload = {"product_name": title or None, "deck": deck, "comments": asked, "sections": parts or None}
     if screens:
         payload["app_tour"] = screens
+    if documents:
+        payload["documents"] = documents
     raw, usage = chat_json(prompt, payload, f"Revising the deck ({len(comments)} comment(s))", log, temperature=0.2)
     log(f"Deck revised: {usage['input_tokens']:,} input + {usage['output_tokens']:,} output tokens "
         f"(about ${usage['cost_usd']:.4f})")

@@ -641,3 +641,20 @@ details.disclosure[open] > summary svg { transform: rotate(90deg); }
 .review-round { margin-top: 12px; }
 .review-round ul { list-style: none; margin: 6px 0 0; padding: 0; }
 @media (max-width: 720px) { .review-stage { grid-template-columns: minmax(0, 1fr); } .review-nav { display: none; } }
+
+/* documents: the upload field, file lists, the report preview */
+.dropzone { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--s6) var(--s4); text-align: center;
+  border: 2px dashed var(--border-strong); border-radius: 12px; background: var(--surface-2); color: var(--text-2); cursor: pointer;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease); }
+.dropzone:hover, .dropzone.over { border-color: var(--blue); background: var(--surface-3); }
+.dropzone:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.dropzone.disabled { opacity: .6; cursor: not-allowed; }
+.link-like { color: var(--link); text-decoration: underline; }
+.file-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.file-list li { display: flex; align-items: center; gap: var(--s2); padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); min-width: 0; }
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.report-frame { width: 100%; height: min(78vh, 900px); border: 1px solid var(--border); border-radius: 10px; margin-top: var(--s4); background: #e9edf2; }
+.slide-sources { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; font-style: italic; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .file-list li { flex-wrap: wrap; } }
+.output-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); }
+@media (max-width: 900px) { .output-grid { grid-template-columns: minmax(0, 1fr); } }

@@ -195,9 +195,29 @@ Apps behind a login: set `storage_state: auth/<name>.json` in the script, then r
 
 ## Making a pitch deck
 
-Open **Pitch decks** → **New deck** (or **Create pitch deck** on a finished video). At the top give the product name and
-the app's link; below, the narration - either one is enough, both make the strongest deck. Pick a design and click
-**Generate deck**. A deck from text takes about 15 seconds; with a link, about 1-2 minutes (the app is explored once).
+Open **Pitch decks** → **New deck** (or **Create pitch deck** on a finished video). Upload documents, give the product
+name and the app's link, and/or write a narration - any one is enough, together they make the strongest deck. Pick a
+design and click **Generate deck**. A deck from text or documents takes about 15 seconds; with a link, about 1-2
+minutes (the app is explored once).
+
+- **What to make:** at the top of the form choose **PowerPoint deck** (designs, review and approval, optional Word
+  report), **Word document** or **PDF document**. For Word and PDF there are no designs or slides to pick: one AI call
+  writes the full document (in the Consulting look, navy and teal), and its page shows it with **Download**, **Read it
+  here** and **Rewrite** (also after changing the brief). The PDF is the same layout printed on A4 by the headless
+  browser, with a cover, contents and page numbers - no Word or LibreOffice needed; a Word version comes with it.
+- **From documents:** upload up to 5 Word (.docx), PDF or Excel (.xlsx) files, 15 MB each (`ppt/documents.py`). Their
+  text (by heading or page) and tables (Excel cells as the sheet shows them: £, %, thousands) become the material; the
+  AI reads the first 15,000 words. Figures, stats and charts come from the files, and code removes any figure they
+  don't state. Each slide records its sources (`file > heading`, `file > page 3`, `file > Sheet > A1:D7`): in its
+  speaker notes and under the slide in the review. Scanned PDFs (no text) are reported, not guessed at (no OCR).
+- **Not covered by your material:** what the brief's focus or your instructions ask for that the material doesn't
+  cover is listed on the deck's page - nothing is made up for it.
+- **Word report:** switch on **Also write a Word report** (on by default with documents), or click **Write the Word
+  report** on a deck's page. One more AI call (about $0.003) writes it from the same material (`ppt/report.py`):
+  a cover, an executive summary with key figures, sections in full paragraphs, conclusions and next steps, and an
+  appendix of large data tables, with the source of every section. Tables and charts are copied from your files' cells
+  by table and column - the AI never types their numbers. It uses the deck's design (fonts and colours); generating
+  another design builds the report in it too, for free. **Read it here** shows it on the page before you download it.
 
 - **Review before it's final:** a new deck opens as a draft (**To review**) showing every slide as it will look - the
   pictures are drawn from the .pptx itself (`ppt/preview.py`, no PowerPoint needed; line breaks can differ slightly).
@@ -252,6 +272,7 @@ From the command line:
 python -m ppt narration.txt --template consulting          # -> narration.pptx
 python -m ppt call.vtt --template pitch-dark --title "ShiftBoard"
 python -m ppt --url https://your-app.example.com --try-forms --out app.pptx    # from the app alone"
+python -m ppt --doc plan.docx --doc figures.xlsx --audience executive --report  # deck + Word report from documents
 ```
 
 ---
@@ -264,10 +285,10 @@ python -m ppt --url https://your-app.example.com --try-forms --out app.pptx    #
 | `api/studio.py` | Video skill API (`/api/studio`): jobs, drafting, review, production, settings, a video's narration |
 | `studio/` | Zen Studio web UI (React + Vite) |
 | `demo/` | Video skill pipeline: `draft` (Azure script), `tts`, `record`, `capture`, `retime`, `render`, `effects`, `check` |
-| `ppt/` | PPT skill: `source` (text cleaning), `writer` (story), `designs/`, `capture` (explores an app's link), `service`, `api` (`/api/ppt`) |
+| `ppt/` | PPT skill: `source` (text cleaning), `documents` (uploaded Word, PDF, Excel), `writer` (story), `designs/`, `report` (the Word report), `capture` (explores an app's link), `service`, `api` (`/api/ppt`) |
 | `demo/examples/` | Example scripts, transcripts and a sample app |
 | `build/studio/<job id>/` | Each video job: `job.json`, `job.log`, `demo.yaml`, `en/final.mp4` … (git-ignored) |
-| `build/decks/<deck id>/` | Each pitch deck: `job.json`, `narration.txt`, `pages/` + `pages.json` (the explored app), `deck.json` (the story), `deck*.pptx` (git-ignored) |
+| `build/decks/<deck id>/` | Each pitch deck: `job.json`, `narration.txt`, `docs/` + `docs.json` (uploaded documents), `pages/` + `pages.json` (the explored app), `deck.json` (the story), `deck*.pptx`, `report.json` + `report*.docx` (git-ignored) |
 | `music/` | Background music tracks (`.mp3`) |
 | `models/` | Generated timed voice model, optional Whisper model (git-ignored) |
 

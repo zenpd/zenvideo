@@ -2,7 +2,7 @@
    "Apply comments" (the AI revises the deck, which is rebuilt and shown again) and "Approve deck". */
 import { useEffect, useState } from "react";
 import Icon from "./icons.jsx";
-import { api, deckFile } from "./api.js";
+import { api, deckFile, reportFile } from "./api.js";
 import { relativeTime } from "./format.js";
 import { Alert, PanelHead, Spinner, useToast } from "./ui.jsx";
 
@@ -82,7 +82,9 @@ export default function DeckReview({ deck, running, names, onChanged }) {
         <figure className="review-slide">
           <img src={url(pics[at])} alt={`Slide ${slide} of ${total}`} />
           {running && <div className="review-busy"><Spinner label="Revising the deck…" /></div>}
-          <figcaption className="meta">Slide {slide} of {total}{count(slide) ? ` · ${count(slide)} comment${count(slide) > 1 ? "s" : ""}` : ""}</figcaption>
+          <figcaption className="meta">Slide {slide} of {total}{count(slide) ? ` · ${count(slide)} comment${count(slide) > 1 ? "s" : ""}` : ""}
+            {deck.slide_sources?.[at]?.length > 0 && <span className="slide-sources"><Icon name="fileText" size={14} />Sources: {deck.slide_sources[at].join("; ")}</span>}
+          </figcaption>
         </figure>
         <button type="button" className="btn btn-ghost review-nav" aria-label="Next slide" disabled={at === total - 1} onClick={() => setAt(at + 1)}>
           <Icon name="chevronRight" size={22} />
@@ -148,9 +150,16 @@ export default function DeckReview({ deck, running, names, onChanged }) {
           </>
         )}
         {approved && (
-          <a className="btn btn-primary btn-lg" href={api.deckDownloadUrl(deck.id, deckFile(deck.template))} download>
-            <Icon name="download" size={18} />Download PPTX
-          </a>
+          <>
+            <a className="btn btn-primary btn-lg" href={api.deckDownloadUrl(deck.id, deckFile(deck.template))} download>
+              <Icon name="download" size={18} />Download PPTX
+            </a>
+            {deck.report_files?.[deck.template] && (
+              <a className="btn btn-lg" href={api.deckDownloadUrl(deck.id, reportFile(deck.template))} download>
+                <Icon name="fileText" size={18} />Download Word report
+              </a>
+            )}
+          </>
         )}
       </div>
 

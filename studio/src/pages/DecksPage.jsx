@@ -7,6 +7,7 @@ import { navigate, query } from "../router.js";
 import { BriefPicker, DEFAULT_BRIEF, DeckBar, DesignGrid, RequestReport, useDeckFinishToast, useDeckTemplates } from "../DeckDesigns.jsx";
 import { Alert, ConfirmDialog, Empty, Field, PageHead, PanelHead, Spinner, Switch, useToast } from "../ui.jsx";
 import DeckReview from "../DeckReview.jsx";
+import { DocumentPicker, DocumentsRead, Gaps, OUTPUTS, OutputPicker, ReportPanel, readFiles } from "../DeckDocuments.jsx";
 
 const STATE = {
   running: ["b-violet", "Generating"],
@@ -50,7 +51,7 @@ export default function DecksPage() {
     <>
       <PageHead
         title="Pitch decks"
-        subtitle="Strong pitch decks from your app's link, a narration, call transcript or notes - no video needed. Decks made from a video show here too."
+        subtitle="Strong pitch decks - and Word reports - from your documents, your app's link, a narration, call transcript or notes. Decks made from a video show here too."
         actions={<button type="button" className="btn btn-primary btn-lg" onClick={() => navigate("/decks/new")}><Icon name="plus" />New deck</button>}
       />
       {error && <p className="error-text">Couldn't load decks: {error}</p>}
@@ -68,15 +69,16 @@ export default function DecksPage() {
           <li key={d.id} className="rise" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
             <a className="vcard hoverable" href={`#/decks/${d.id}`}>
               <span className="vcard-media">
-                {d.pages ? <img src={api.deckShotUrl(d.id, "01.png")} alt="" loading="lazy" /> : <Icon name={d.url ? "presentation" : "fileText"} size={34} />}
+                {d.pages ? <img src={api.deckShotUrl(d.id, "01.png")} alt="" loading="lazy" /> : <Icon name={(d.output || "pptx") !== "pptx" ? "fileText" : d.url ? "presentation" : "fileText"} size={34} />}
               </span>
               <span className="vcard-body">
                 <span style={{ font: "700 16px/22px var(--font)" }}>{d.title}</span>
-                <span className="meta">{d.source_video ? `From video “${d.source_title}”` : d.url ? host(d.url) : "From narration"} · {relativeTime(d.created)}</span>
+                <span className="meta">{d.source_video ? `From video “${d.source_title}”` : d.url ? host(d.url) : d.documents ? `From ${d.documents} document${d.documents === 1 ? "" : "s"}` : "From narration"}{(d.output || "pptx") !== "pptx" ? ` · ${d.output === "pdf" ? "PDF" : "Word"} document` : d.report ? " · with report" : ""} · {relativeTime(d.created)}</span>
                 <span className="row" style={{ justifyContent: "space-between", marginTop: 4 }}>
                   <DeckStatus status={d.status} />
                   <span className="row meta" style={{ gap: 6 }}>
-                    <Icon name="palette" size={15} />{Object.keys(d.decks || {}).length} design{Object.keys(d.decks || {}).length === 1 ? "" : "s"}
+                    {(d.output || "pptx") !== "pptx" ? <><Icon name="fileText" size={15} />{d.output === "pdf" ? "PDF" : "Word"}</>
+                      : <><Icon name="palette" size={15} />{Object.keys(d.decks || {}).length} design{Object.keys(d.decks || {}).length === 1 ? "" : "s"}</>}
                   </span>
                 </span>
               </span>
@@ -118,6 +120,11 @@ export function NewDeckPage() {
   const [brief, setBrief] = useState(DEFAULT_BRIEF);
   const [video] = useState(() => query().video || "");
   const [source, setSource] = useState(null);   // the video the narration comes from
+  const [files, setFiles] = useState([]);       // uploaded documents (File objects)
+  const [report, setReport] = useState(null);   // also write a Word report (null: follow whether there are files)
+  const [output, setOutput] = useState("pptx");  // what to make: pptx, docx or pdf
+  const deckOut = output === "pptx";
+  const outLabel = OUTPUTS.find((o) => o.id === output)?.label || "deck";
   useEffect(() => { if (!choice && templates?.length) setChoice(templates[0].id); }, [templates, choice]);
   useEffect(() => {
     if (!video) return;
@@ -131,20 +138,25 @@ export function NewDeckPage() {
   const n = words(narration);
   const link = source ? "" : url.trim();
   const urlOk = !link || /^https?:\/\/[^\s/]+/i.test(link);
-  const narrationOk = n >= 20 || (!!link && n === 0);   // a link alone is enough
+  const docs = files.length > 0;
+  const withReport = report ?? docs;
+  const narrationOk = n >= 20 || ((!!link || docs) && n === 0);   // a link or documents alone are enough
   const submit = async (e) => {
     e?.preventDefault();
     setTouched(true);
-    if (!narrationOk || !urlOk || !choice) return;
+    if (!narrationOk || !urlOk || (deckOut && !choice)) return;
     if (brief.audience === "custom" && !brief.instructions?.trim()) {
       toast("Write your instructions, or pick another option under “Who is it for?”", "error");
       return;
     }
     setBusy(true);
     try {
+      const uploads = await readFiles(files);
       const d = await api.createDeck({ narration: narration.trim(), url: link, try_forms: !!link && tryForms,
-        title: title.trim(), template: choice, source_video: source?.id || "", source_title: source?.title || "", ...brief });
-      toast(link ? "Exploring your app, then writing the slides…" : "Writing the slides…", "info");
+        title: title.trim(), template: choice, source_video: source?.id || "", source_title: source?.title || "", ...brief,
+        files: uploads, report: deckOut && withReport, output });
+      const what = deckOut ? "the slides" : `the ${outLabel}`;
+      toast(link ? `Exploring your app, then writing ${what}…` : docs ? `Reading your documents, then writing ${what}…` : `Writing ${what}…`, "info");
       navigate(`/decks/${d.id}`);
     } catch (err) {
       toast(err.message, "error");
@@ -158,8 +170,9 @@ export function NewDeckPage() {
       <PageHead
         crumbs={source ? [{ label: "Library", to: "/videos" }, { label: source.title, to: `/videos/${source.id}` }, { label: "Pitch deck" }]
           : [{ label: "Pitch decks", to: "/decks" }, { label: "New deck" }]}
-        title={source ? "Create a pitch deck" : "New pitch deck"}
-        subtitle="Give your app's link, a narration, call transcript or notes - or both - and pick a design. The AI plans the deck's story and slides in one call; switching design afterwards is free." />
+        title={source ? "Create a pitch deck" : deckOut ? "New pitch deck" : `New ${outLabel}`}
+        subtitle={deckOut ? "Upload documents, give your app's link, or a narration, call transcript or notes - or any mix - and pick a design. The AI plans the deck's story and slides in one call, and can write a Word report from the same material; switching design afterwards is free."
+          : "Upload documents, give your app's link, or a narration, call transcript or notes - or any mix. The AI writes the whole document in one call; its tables and charts are copied from your files."} />
       {video && !source && <div style={{ marginBottom: 16 }}><Spinner label="Loading the video's narration…" /></div>}
       {source && (
         <div style={{ marginBottom: 24 }}>
@@ -169,16 +182,35 @@ export function NewDeckPage() {
         </div>
       )}
       <div className="stack">
+        {!source && <section className="panel rise" aria-labelledby="output-title">
+          <PanelHead icon="sparkles" tone="violet" title={<span id="output-title">What do you want to make?</span>}
+            subtitle="A designed PowerPoint deck, or a full written document as Word or PDF - from the same material." />
+          <OutputPicker value={output} onChange={setOutput} disabled={busy} />
+        </section>}
+        {!source && <section className="panel rise" aria-labelledby="docs-title">
+          <PanelHead icon="fileText" tone="yellow" title={<span id="docs-title">Documents (optional)</span>}
+            subtitle={deckOut ? "Reports, business cases, proposals, spreadsheets. Their text and tables become the deck's material: figures and charts come from your files, and every slide notes which file and page or sheet its facts come from."
+              : "Reports, business cases, proposals, spreadsheets. Their text and tables become the document's material: tables and charts are copied from your files, and every section notes which file and page or sheet its facts come from."} />
+          <DocumentPicker files={files} onChange={setFiles} disabled={busy} />
+          {deckOut && <div style={{ marginTop: 16 }}>
+            <Switch label="Also write a Word report" checked={withReport} onChange={setReport} disabled={busy} />
+            <span className="meta" style={{ display: "block", marginTop: 4 }}>
+              {withReport ? "A full report from the same material: executive summary, key figures, sections with your tables and charts, conclusions and next steps - in the deck's design. One more AI call (under a cent)."
+                : "Off: only the deck. You can still write the report later from the deck's page."}
+            </span>
+          </div>}
+        </section>}
         <section className="panel rise" aria-labelledby="app-title">
           <PanelHead icon="link" tone="blue" title={<span id="app-title">Your app</span>}
-            subtitle={source ? "The deck is about the app this video shows." : "With a link, the app is explored page by page - its pages, tabs, lists and results - and the deck is built from what it shows. Its screens go on the slides."} />
+            subtitle={source ? "The deck is about the app this video shows." : deckOut ? "With a link, the app is explored page by page - its pages, tabs, lists and results - and the deck is built from what it shows. Its screens go on the slides."
+              : "Optional. With a link, the app is explored page by page and what its pages show becomes material for the document."} />
           <div className="deck-form">
             <Field label="Product name" htmlFor="deck-title" hint="Optional. Otherwise it's taken from the app or the narration.">
               <input id="deck-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. PayFlow Orchestrator" />
             </Field>
             {!source && <Field label="App link" htmlFor="deck-url"
               error={touched && !urlOk ? "Enter a full address, e.g. https://your-app.example.com" : null}
-              hint={link ? "Explored once (about a minute). It never deletes, saves, pays, sends or logs out." : "Give a link, a narration below, or both (the strongest deck)."}>
+              hint={link ? "Explored once (about a minute). It never deletes, saves, pays, sends or logs out." : deckOut ? "Give a link, a narration below, or both (the strongest deck)." : "Optional - documents or a narration are enough."}>
               <div className="input-wrap">
                 <Icon name="link" size={18} />
                 <input id="deck-url" className="input" type="url" inputMode="url" placeholder="https://your-app.example.com"
@@ -198,42 +230,44 @@ export function NewDeckPage() {
         </section>
 
         <section className="panel rise" aria-labelledby="narration-title">
-          <PanelHead icon="mic" tone="violet" title={<span id="narration-title">Narration{link ? " (optional)" : ""}</span>}
+          <PanelHead icon="mic" tone="violet" title={<span id="narration-title">Narration{link || docs ? " (optional)" : ""}</span>}
             subtitle="A video narration, a call or meeting transcript (speaker names, timestamps and subtitles are fine), or notes. With a link too, the narration leads the story and the app adds the screens." />
-          <Field label="Narration, transcript or notes" required={!link} htmlFor="deck-narration"
-            error={touched && !narrationOk ? (link ? "Write at least a few sentences (20+ words), or leave it empty to use the app alone." : "Give your app's link above, or write at least a few sentences about the app (20+ words).") : null}
-            hint={`${n.toLocaleString()} words. Click and typing instructions, filler words and small talk are ignored. Figures you mention can appear on the slides; the AI never makes them up.`}>
+          <Field label="Narration, transcript or notes" required={!link && !docs} htmlFor="deck-narration"
+            error={touched && !narrationOk ? (link || docs ? "Write at least a few sentences (20+ words), or leave it empty." : "Upload a document, give your app's link above, or write at least a few sentences (20+ words).") : null}
+            hint={`${n.toLocaleString()} words. Click and typing instructions, filler words and small talk are ignored. Figures you mention can appear in the ${deckOut ? "slides" : "document"}; the AI never makes them up.`}>
             <textarea id="deck-narration" className="textarea" rows={link ? 8 : 12} value={narration} placeholder={NARRATION_HINT}
               aria-invalid={touched && !narrationOk ? "true" : undefined} onChange={(e) => setNarration(e.target.value)} />
           </Field>
         </section>
 
         <section className="panel rise" aria-labelledby="brief-title">
-          <PanelHead icon="user" tone="turq" title={<span id="brief-title">Deck brief</span>}
-            subtitle="Who the deck is for decides what leads, what's left out and how it's said." />
-          <BriefPicker value={brief} onChange={setBrief} disabled={busy} />
+          <PanelHead icon="user" tone="turq" title={<span id="brief-title">{deckOut ? "Deck brief" : "Brief"}</span>}
+            subtitle={`Who the ${deckOut ? "deck" : "document"} is for decides what leads, what's left out and how it's said.`} />
+          <BriefPicker value={brief} onChange={setBrief} disabled={busy} document={!deckOut} />
         </section>
 
-        <section aria-labelledby="design-title" className="stack" style={{ gap: 14 }}>
+        {deckOut && <section aria-labelledby="design-title" className="stack" style={{ gap: 14 }}>
           <h2 id="design-title" className="section-title">Choose a design</h2>
           {loadError && <Alert intent="error" title="Couldn't load the designs">{loadError}</Alert>}
           {!templates && !loadError && <Spinner label="Loading designs…" />}
           {templates && <DesignGrid templates={templates} choice={choice} onSelect={setChoice}
             title={title.trim() || "Your product"} textOnly={!link} disabled={busy} />}
-        </section>
+        </section>}
 
         <section className="panel deck-bar" aria-label="Generate">
           <div className="deck-bar-main">
             <div className="grow" style={{ minWidth: 220 }}>
-              <span className="meta">Selected design</span>
-              <h2 className="section-title">{names[choice] || "None"}</h2>
+              <span className="meta">{deckOut ? "Selected design" : "You'll get"}</span>
+              <h2 className="section-title">{deckOut ? names[choice] || "None" : outLabel}</h2>
             </div>
             <span className="meta" style={{ maxWidth: 360 }}>
-              {link ? "About 1-2 minutes: exploring your app page by page, then one AI call writes the story." : "About 15 seconds: one AI call plans and writes the whole deck."}
+              {deckOut ? (link ? "About 1-2 minutes: exploring your app page by page, then one AI call writes the story." : "About 15 seconds: one AI call plans and writes the whole deck.")
+                : `${link ? "About 1-2 minutes with the app's link" : "About 20-40 seconds"}: one AI call writes the document; tables and charts come straight from your files.`}
+              {deckOut && withReport ? " The Word report adds about 20-40 seconds." : ""}
             </span>
-            <button type="submit" className="btn btn-primary btn-lg" disabled={busy || !choice}>
+            <button type="submit" className="btn btn-primary btn-lg" disabled={busy || (deckOut && !choice)}>
               {busy ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} aria-hidden="true" /> : <Icon name="sparkles" size={18} />}
-              {busy ? "Starting…" : "Generate deck"}
+              {busy ? "Starting…" : !deckOut ? `Generate ${outLabel}` : withReport ? "Generate deck and report" : "Generate deck"}
             </button>
           </div>
         </section>
@@ -255,7 +289,7 @@ export function LinkDeckPage({ id }) {
   useEffect(() => { if (!brief && deck?.brief) setBrief(deck.brief); }, [deck, brief]);
   const briefChanged = !!(brief && deck?.brief && JSON.stringify(brief) !== JSON.stringify(deck.brief));
   useEffect(() => { if (!choice && deck?.template) setChoice(deck.template); }, [deck, choice]);
-  useDeckFinishToast(deck?.status);
+  useDeckFinishToast(deck?.status, deck?.output);
 
   if (error) return <Alert intent="error" title="Couldn't load this deck">{error}</Alert>;
   if (!deck || (!templates && !loadError)) return <div style={{ paddingTop: 80 }}><Spinner label="Loading…" /></div>;
@@ -285,6 +319,7 @@ export function LinkDeckPage({ id }) {
     }
   };
   const first = deck.pages?.[0];
+  const isDoc = (deck.output || "pptx") !== "pptx";
 
   return (
     <>
@@ -293,8 +328,10 @@ export function LinkDeckPage({ id }) {
         title={<span className="row" style={{ gap: 14, flexWrap: "wrap" }}>{deck.title}<DeckStatus status={deck.status} /></span>}
         subtitle={<>
           {deck.source_video ? <a href={`#/videos/${deck.source_video}`}>From video “{deck.source_title}”</a>
-            : deck.url ? <a href={deck.url} target="_blank" rel="noreferrer">{host(deck.url)}</a> : "From narration"}
+            : deck.url ? <a href={deck.url} target="_blank" rel="noreferrer">{host(deck.url)}</a>
+              : deck.documents?.length ? `From ${deck.documents.length} document${deck.documents.length === 1 ? "" : "s"}` : "From narration"}
           {" · "}created {relativeTime(deck.created)}
+          {isDoc && ` · ${deck.output === "pdf" ? "PDF" : "Word"} document`}
           {deck.usage?.calls > 0 && <> · {deck.usage.calls} Azure call{deck.usage.calls === 1 ? "" : "s"}, {(deck.usage.input_tokens + deck.usage.output_tokens).toLocaleString()} tokens, about ${deck.usage.cost_usd.toFixed(4)}</>}
         </>}
         actions={<>
@@ -307,10 +344,15 @@ export function LinkDeckPage({ id }) {
       />
 
       <div className="stack">
-        {templates && deck.preview?.length > 0 && (
+        {isDoc && <ReportPanel deck={deck} running={running} onChanged={refresh} brief={briefChanged ? brief : null} />}
+        {deck.status === "failed" && isDoc && <Alert intent="error" title="The document couldn't be written">{deck.error}</Alert>}
+        {!isDoc && templates && deck.preview?.length > 0 && (
           <DeckReview deck={deck} running={running} onChanged={refresh}
             names={Object.fromEntries(templates.map((t) => [t.id, t.name]))} />
         )}
+        <Gaps deck={deck} />
+        {!isDoc && deck.files?.[deckFile(deck.template)] && <ReportPanel deck={deck} running={running} onChanged={refresh} />}
+        <DocumentsRead deck={deck} />
         {deck.narration && (
           <details className="disclosure panel rise">
             <summary><Icon name="chevronRight" size={16} />Narration · {deck.narration.trim().split(/\s+/).length} words</summary>
@@ -338,15 +380,15 @@ export function LinkDeckPage({ id }) {
         {brief && (
           <details className="disclosure panel rise" open={briefChanged || undefined}>
             <summary>
-              <Icon name="chevronRight" size={16} />Deck brief · {AUDIENCE_LABEL[deck.brief.audience] || "Auto"}, {deck.brief.length}
+              <Icon name="chevronRight" size={16} />{isDoc ? "Brief" : "Deck brief"} · {AUDIENCE_LABEL[deck.brief.audience] || "Auto"}, {deck.brief.length}
               {deck.brief.focus ? `, focus: ${deck.brief.focus}` : ""}
             </summary>
             <div style={{ marginTop: 16 }}>
-              <BriefPicker value={brief} onChange={setBrief} disabled={running} />
+              <BriefPicker value={brief} onChange={setBrief} disabled={running} document={isDoc} />
               {briefChanged && (
                 <div style={{ marginTop: 14 }}>
                   <Alert intent="info" title="New brief">
-                    Generating rewrites the story for this brief (one AI call). <button type="button" className="btn btn-sm btn-ghost"
+                    {isDoc ? "“Write again with the new brief” above rewrites the document for it (one AI call)." : "Generating rewrites the story for this brief (one AI call)."} <button type="button" className="btn btn-sm btn-ghost"
                       onClick={() => setBrief(deck.brief)}>Undo changes</button>
                   </Alert>
                 </div>
@@ -354,9 +396,9 @@ export function LinkDeckPage({ id }) {
             </div>
           </details>
         )}
-        {deck.status !== "running" && <RequestReport requests={deck.requests} />}
-        {loadError && <Alert intent="error" title="Couldn't load the designs">{loadError}</Alert>}
-        {templates && (
+        {!isDoc && deck.status !== "running" && <RequestReport requests={deck.requests} />}
+        {!isDoc && loadError && <Alert intent="error" title="Couldn't load the designs">{loadError}</Alert>}
+        {!isDoc && templates && (
           <>
             <DesignGrid templates={templates} choice={choice} onSelect={setChoice} title={deck.title} textOnly={!deck.pages?.length}
               shot={first ? api.deckShotUrl(deck.id, first.file) : null} slides={slides} fileUrl={fileUrl} disabled={running} />

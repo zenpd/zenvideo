@@ -32,7 +32,9 @@ export function useBriefOptions() {
 }
 
 /** Who the deck is for, how long it is, what it stresses. The story is written for this brief. */
-export function BriefPicker({ value, onChange, disabled }) {
+const PAGES = { short: "2–3 pages", standard: "4–8 pages", detailed: "9–15 pages" };
+
+export function BriefPicker({ value, onChange, disabled, document = false }) {
   const options = useBriefOptions();
   if (!options) return null;
   const set = (key, v) => onChange({ ...value, [key]: v });
@@ -54,7 +56,8 @@ export function BriefPicker({ value, onChange, disabled }) {
       </fieldset>
       {value.audience === "custom" && (
         <Field label="Your instructions" required htmlFor="deck-instructions"
-          hint="Anything you want: slide order, charts (pie, bar, column, line, doughnut) with their numbers, tone, what to leave out. Slide 1 is the first slide after the title slide. Charts only use numbers from your text or these instructions.">
+          hint={document ? "Anything you want: sections, what to emphasise, tone, what to leave out. Tables and charts only use your documents' own figures."
+            : "Anything you want: slide order, charts (pie, bar, column, line, doughnut) with their numbers, tone, what to leave out. Slide 1 is the first slide after the title slide. Charts only use numbers from your text or these instructions."}>
           <textarea id="deck-instructions" className="textarea" rows={5} maxLength={1500} disabled={disabled}
             value={value.instructions || ""} placeholder={INSTRUCTIONS_HINT}
             onChange={(e) => set("instructions", e.target.value)} />
@@ -63,11 +66,11 @@ export function BriefPicker({ value, onChange, disabled }) {
       <div className="deck-form">
         <div>
           <span className="label" id="deck-length-label" style={{ display: "block", marginBottom: 8 }}>Length</span>
-          <Segmented label="Deck length" value={value.length} onChange={(v) => set("length", v)} disabled={disabled}
-            options={options.lengths.map((l) => ({ value: l.id, label: `${l.label} · ${l.slides.replace("-", "–")} slides` }))} />
-          <span className="hint" style={{ display: "block", marginTop: 6 }}>Longer decks need enough material; the AI never pads with made-up content.</span>
+          <Segmented label={document ? "Document length" : "Deck length"} value={value.length} onChange={(v) => set("length", v)} disabled={disabled}
+            options={options.lengths.map((l) => ({ value: l.id, label: `${l.label} · ${document ? PAGES[l.id] : `${l.slides.replace("-", "–")} slides`}` }))} />
+          <span className="hint" style={{ display: "block", marginTop: 6 }}>Longer {document ? "documents" : "decks"} need enough material; the AI never pads with made-up content.</span>
         </div>
-        <Field label="Focus (optional)" htmlFor="deck-focus" hint="Gets extra weight, e.g. its own slide, when your text covers it.">
+        <Field label="Focus (optional)" htmlFor="deck-focus" hint={`Gets extra weight, e.g. its own ${document ? "section" : "slide"}, when your material covers it.`}>
           <input id="deck-focus" className="input" value={value.focus} maxLength={200} disabled={disabled}
             onChange={(e) => set("focus", e.target.value)} placeholder="e.g. compliance and audit, ROI, ease of rollout" />
         </Field>
@@ -106,11 +109,11 @@ export function RequestReport({ requests }) {
 }
 
 /** Toast when a deck the user is watching finishes (not on page load). */
-export function useDeckFinishToast(status) {
+export function useDeckFinishToast(status, output = "pptx") {
   const toast = useToast();
   const [last, setLast] = useState(status);
   useEffect(() => {
-    if (last === "running" && status === "done") toast("Your pitch deck is ready");
+    if (last === "running" && status === "done") toast(output === "pptx" ? "Your pitch deck is ready" : `Your ${output === "pdf" ? "PDF" : "Word"} document is ready`);
     if (last === "running" && status === "review") toast("Your deck is ready to review");
     if (last === "running" && status === "failed") toast("The deck could not be generated", "error");
     setLast(status);

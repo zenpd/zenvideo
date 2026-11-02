@@ -45,6 +45,8 @@ export const api = {
   buildDeck: (id, body) => pptPost(`/decks/${id}/build`, body),
   reviseDeck: (id, body) => pptPost(`/decks/${id}/revise`, body),
   approveDeck: (id) => pptPost(`/decks/${id}/approve`, {}),
+  writeReport: (id, body) => pptPost(`/decks/${id}/report`, body),
+  reportPreviewUrl: (id, template) => `${ppt}/decks/${id}/report/preview?template=${template}`,
   deckPreviewUrl: (id, template, file) => `${ppt}/decks/${id}/preview/${template}/${file}`,
   removeDeck: (id) => request(`${ppt}/decks/${id}`, { method: "DELETE" }),
   deckDownloadUrl: (id, name) => `${ppt}/decks/${id}/files/${name}`,
@@ -55,3 +57,5 @@ export const api = {
 
 /** The file a deck design is saved as (the original Zen Studio design keeps the old name). */
 export const deckFile = (template) => (template === "zen" ? "deck.pptx" : `deck-${template}.pptx`);
+/** The Word report written in a design's look. */
+export const reportFile = (template, fmt = "docx") => (template === "zen" ? `report.${fmt}` : `report-${template}.${fmt}`);
